@@ -1,5 +1,13 @@
 -- heyneighbor_schema.sql
 
+-- Drop dependent tables first to avoid foreign key constraint errors
+DROP TABLE IF EXISTS Rating;
+DROP TABLE IF EXISTS LendingHistory;
+DROP TABLE IF EXISTS BorrowingHistory;
+DROP TABLE IF EXISTS BorrowingRequest;
+DROP TABLE IF EXISTS Item;
+DROP TABLE IF EXISTS "User";
+
 CREATE TABLE "User" (
     user_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
