@@ -1,6 +1,8 @@
 -- heyneighbor_schema.sql
 
 -- Drop dependent tables first to avoid foreign key constraint errors
+DROP TABLE IF EXISTS Messages;
+DROP TABLE IF EXISTS Bookmark;
 DROP TABLE IF EXISTS Rating;
 DROP TABLE IF EXISTS LendingHistory;
 DROP TABLE IF EXISTS BorrowingHistory;
@@ -65,4 +67,26 @@ CREATE TABLE Rating (
     date DATE DEFAULT CURRENT_DATE,
     FOREIGN KEY (rater_id) REFERENCES "User"(user_id),
     FOREIGN KEY (ratee_id) REFERENCES "User"(user_id)
+);
+
+CREATE TABLE Bookmark (
+    bookmark_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (item_id) REFERENCES Item(item_id),
+    UNIQUE (user_id, item_id)
+);
+
+CREATE TABLE Messages (
+    message_id SERIAL PRIMARY KEY,
+    sender_id INT NOT NULL,
+    receiver_id INT NOT NULL,
+    item_id INT,
+    content TEXT NOT NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (receiver_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
