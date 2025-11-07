@@ -8,9 +8,9 @@ DROP TABLE IF EXISTS LendingHistory;
 DROP TABLE IF EXISTS BorrowingHistory;
 DROP TABLE IF EXISTS BorrowingRequest;
 DROP TABLE IF EXISTS Item;
-DROP TABLE IF EXISTS "User";
+DROP TABLE IF EXISTS User;
 
-CREATE TABLE "User" (
+CREATE TABLE User (
     user_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     profile_picture VARCHAR(255),
@@ -24,7 +24,7 @@ CREATE TABLE Item (
     category VARCHAR(50),
     status VARCHAR(20) DEFAULT 'available',
     owner_id INT NOT NULL,
-    FOREIGN KEY (owner_id) REFERENCES "User"(user_id)
+    FOREIGN KEY (owner_id) REFERENCES User(user_id)
 );
 
 CREATE TABLE BorrowingRequest (
@@ -34,8 +34,8 @@ CREATE TABLE BorrowingRequest (
     item_id INT NOT NULL,
     request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(20) DEFAULT 'pending',
-    FOREIGN KEY (borrower_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (lister_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (borrower_id) REFERENCES User(user_id),
+    FOREIGN KEY (lister_id) REFERENCES User(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
@@ -45,7 +45,7 @@ CREATE TABLE BorrowingHistory (
     item_id INT NOT NULL,
     returned BOOLEAN DEFAULT FALSE,
     return_date DATE,
-    FOREIGN KEY (borrower_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (borrower_id) REFERENCES User(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
@@ -54,7 +54,7 @@ CREATE TABLE LendingHistory (
     lender_id INT NOT NULL,
     item_id INT NOT NULL,
     availability_duration INT,
-    FOREIGN KEY (lender_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (lender_id) REFERENCES User(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
@@ -64,8 +64,8 @@ CREATE TABLE Rating (
     ratee_id INT NOT NULL,
     score INT CHECK (score BETWEEN 1 AND 5),
     date DATE DEFAULT CURRENT_DATE,
-    FOREIGN KEY (rater_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (ratee_id) REFERENCES "User"(user_id)
+    FOREIGN KEY (rater_id) REFERENCES User(user_id),
+    FOREIGN KEY (ratee_id) REFERENCES User(user_id)
 );
 
 CREATE TABLE Bookmark (
@@ -73,7 +73,7 @@ CREATE TABLE Bookmark (
     user_id INT NOT NULL,
     item_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (user_id) REFERENCES User(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id),
     UNIQUE (user_id, item_id)
 );
@@ -85,13 +85,13 @@ CREATE TABLE Messages (
     item_id INT,
     content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sender_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (receiver_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (sender_id) REFERENCES User(user_id),
+    FOREIGN KEY (receiver_id) REFERENCES User(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
 -- Allow users to select data from tables
-GRANT SELECT ON "User" TO PUBLIC;
+GRANT SELECT ON User TO PUBLIC;
 GRANT SELECT ON Item TO PUBLIC;
 GRANT SELECT ON BorrowingRequest TO PUBLIC;
 GRANT SELECT ON BorrowingHistory TO PUBLIC;
@@ -103,7 +103,7 @@ GRANT SELECT ON Messages TO PUBLIC;
 -- Add sample records
 
 -- Users
-INSERT INTO "User" (name, profile_picture, rating) VALUES
+INSERT INTO User (name, profile_picture, rating) VALUES
 ('Alice Johnson', 'alice.jpg', 4.8),
 ('Bob Smith', 'bob.jpg', 4.5),
 ('Charlie Kim', 'charlie.png', 4.2),
