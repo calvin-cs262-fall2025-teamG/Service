@@ -1,14 +1,8 @@
 -- hey neighbor sample queries
 
--- list all users and their ratings
-SELECT user_id, name, rating
-FROM "User"
-ORDER BY rating DESC;
-
--- list users who have a perfect 5.0 rating
-SELECT name
-FROM "User"
-WHERE rating = 5.0;
+-- list all users 
+SELECT user_id, name
+FROM "User";
 
 -- show available items with their owners
 SELECT i.item_id, i.name AS item_name, u.name AS owner_name -- to prevent confusion between owner_name and item_name
@@ -32,11 +26,7 @@ JOIN "User" u ON br.borrower_id = u.user_id
 JOIN Item i ON br.item_id = i.item_id
 WHERE br.borrower_id = 2;
 
--- list lending history
-SELECT u.name AS lender, i.name AS item, lh.availability_duration
-FROM LendingHistory lh
-JOIN "User" u ON lh.lender_id = u.user_id
-JOIN Item i ON lh.item_id = i.item_id;
+
 
 
 
