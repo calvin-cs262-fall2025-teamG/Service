@@ -6,10 +6,10 @@ DROP TABLE IF EXISTS Bookmark;
 DROP TABLE IF EXISTS BorrowingHistory;
 DROP TABLE IF EXISTS BorrowingRequest;
 DROP TABLE IF EXISTS Item;
-DROP TABLE IF EXISTS "User";
+DROP TABLE IF EXISTS app_user;
 
 -- Users
-CREATE TABLE "User" (
+CREATE TABLE app_user (
     user_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     profile_picture VARCHAR(255)
@@ -23,7 +23,7 @@ CREATE TABLE Item (
     category VARCHAR(50),
     status VARCHAR(20) DEFAULT 'available',
     owner_id INT NOT NULL,
-    FOREIGN KEY (owner_id) REFERENCES "User"(user_id)
+    FOREIGN KEY (owner_id) REFERENCES app_user(user_id)
 );
 
 -- Borrowing Requests
@@ -34,8 +34,8 @@ CREATE TABLE BorrowingRequest (
     item_id INT NOT NULL,
     request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(20) DEFAULT 'pending',
-    FOREIGN KEY (borrower_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (lister_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (borrower_id) REFERENCES app_user(user_id),
+    FOREIGN KEY (lister_id) REFERENCES app_user(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
@@ -53,7 +53,7 @@ CREATE TABLE Bookmark (
     user_id INT NOT NULL,
     item_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (user_id) REFERENCES app_user(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id),
     UNIQUE (user_id, item_id)
 );
@@ -66,13 +66,13 @@ CREATE TABLE Messages (
     item_id INT,
     content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sender_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (receiver_id) REFERENCES "User"(user_id),
+    FOREIGN KEY (sender_id) REFERENCES app_user(user_id),
+    FOREIGN KEY (receiver_id) REFERENCES app_user(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
 -- Grants
-GRANT SELECT ON "User" TO PUBLIC;
+GRANT SELECT ON app_user TO PUBLIC;
 GRANT SELECT ON Item TO PUBLIC;
 GRANT SELECT ON BorrowingRequest TO PUBLIC;
 GRANT SELECT ON BorrowingHistory TO PUBLIC;
@@ -80,7 +80,7 @@ GRANT SELECT ON Bookmark TO PUBLIC;
 GRANT SELECT ON Messages TO PUBLIC;
 
 -- Sample Users
-INSERT INTO "User" (name, profile_picture) VALUES
+INSERT INTO app_user (name, profile_picture) VALUES
 ('Alice Johnson', 'alice.jpg'),
 ('Bob Smith', 'bob.jpg'),
 ('Charlie Kim', 'charlie.png'),
