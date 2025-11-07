@@ -1,22 +1,21 @@
--- heyneighbor_schema.sql
+-- heyneighbor_schema 
 
--- Drop dependent tables first to avoid foreign key constraint errors
+-- Drop dependent tables first
 DROP TABLE IF EXISTS Messages;
 DROP TABLE IF EXISTS Bookmark;
-DROP TABLE IF EXISTS Rating;
-DROP TABLE IF EXISTS LendingHistory;
 DROP TABLE IF EXISTS BorrowingHistory;
 DROP TABLE IF EXISTS BorrowingRequest;
 DROP TABLE IF EXISTS Item;
 DROP TABLE IF EXISTS "User";
 
+-- Users
 CREATE TABLE "User" (
     user_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    profile_picture VARCHAR(255),
-    rating DECIMAL(2,1) DEFAULT 0.0
+    profile_picture VARCHAR(255)
 );
 
+-- Items
 CREATE TABLE Item (
     item_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -27,6 +26,7 @@ CREATE TABLE Item (
     FOREIGN KEY (owner_id) REFERENCES "User"(user_id)
 );
 
+-- Borrowing Requests
 CREATE TABLE BorrowingRequest (
     request_id SERIAL PRIMARY KEY,
     borrower_id INT NOT NULL,
@@ -39,6 +39,7 @@ CREATE TABLE BorrowingRequest (
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
+-- Borrowing History
 CREATE TABLE BorrowingHistory (
     request_id INT PRIMARY KEY,
     returned BOOLEAN DEFAULT FALSE,
@@ -46,25 +47,7 @@ CREATE TABLE BorrowingHistory (
     FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
 );
 
-CREATE TABLE LendingHistory (
-    history_id SERIAL PRIMARY KEY,
-    lender_id INT NOT NULL,
-    item_id INT NOT NULL,
-    availability_duration INT,
-    FOREIGN KEY (lender_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id)
-);
-
-CREATE TABLE Rating (
-    rating_id SERIAL PRIMARY KEY,
-    rater_id INT NOT NULL,
-    ratee_id INT NOT NULL,
-    score INT CHECK (score BETWEEN 1 AND 5),
-    date DATE DEFAULT CURRENT_DATE,
-    FOREIGN KEY (rater_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (ratee_id) REFERENCES "User"(user_id)
-);
-
+-- Bookmarks
 CREATE TABLE Bookmark (
     bookmark_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
@@ -75,6 +58,7 @@ CREATE TABLE Bookmark (
     UNIQUE (user_id, item_id)
 );
 
+-- Messages
 CREATE TABLE Messages (
     message_id SERIAL PRIMARY KEY,
     sender_id INT NOT NULL,
@@ -87,26 +71,22 @@ CREATE TABLE Messages (
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
--- Allow users to select data from tables
+-- Grants
 GRANT SELECT ON "User" TO PUBLIC;
 GRANT SELECT ON Item TO PUBLIC;
 GRANT SELECT ON BorrowingRequest TO PUBLIC;
 GRANT SELECT ON BorrowingHistory TO PUBLIC;
-GRANT SELECT ON LendingHistory TO PUBLIC;
-GRANT SELECT ON Rating TO PUBLIC;
 GRANT SELECT ON Bookmark TO PUBLIC;
 GRANT SELECT ON Messages TO PUBLIC;
 
--- Add sample records
+-- Sample Users
+INSERT INTO "User" (name, profile_picture) VALUES
+('Alice Johnson', 'alice.jpg'),
+('Bob Smith', 'bob.jpg'),
+('Charlie Kim', 'charlie.png'),
+('Dana Lee', 'dana.png');
 
--- Users
-INSERT INTO "User" (name, profile_picture, rating) VALUES
-('Alice Johnson', 'alice.jpg', 4.8),
-('Bob Smith', 'bob.jpg', 4.5),
-('Charlie Kim', 'charlie.png', 4.2),
-('Dana Lee', 'dana.png', 5.0);
-
--- Items
+-- Sample Items
 INSERT INTO Item (name, image_url, category, status, owner_id) VALUES
 ('Electric Drill', 'drill.jpg', 'Tools', 'available', 1),
 ('Picnic Table', 'table.jpg', 'Outdoor', 'borrowed', 2),
@@ -120,21 +100,9 @@ INSERT INTO BorrowingRequest (borrower_id, lister_id, item_id, status) VALUES
 (4, 3, 4, 'rejected');
 
 -- Borrowing History
-INSERT INTO BorrowingHistory (request_id,returned, return_date) VALUES
+INSERT INTO BorrowingHistory (request_id, returned, return_date) VALUES
 (1, TRUE, '2025-03-10'),
 (2, FALSE, NULL);
-
--- Lending History
-INSERT INTO LendingHistory (lender_id, item_id, availability_duration) VALUES
-(1, 1, 7),
-(2, 2, 10),
-(3, 4, 5);
-
--- Ratings
-INSERT INTO Rating (rater_id, ratee_id, score, date) VALUES
-(2, 1, 5, '2025-03-12'),
-(3, 2, 4, '2025-04-05'),
-(4, 3, 5, '2025-04-20');
 
 -- Bookmarks
 INSERT INTO Bookmark (user_id, item_id) VALUES
@@ -147,5 +115,3 @@ INSERT INTO Messages (sender_id, receiver_id, item_id, content) VALUES
 (2, 1, 1, 'Hi Alice, is the drill still available?'),
 (1, 2, 1, 'Yes, you can borrow it anytime this week!'),
 (3, 2, 2, 'Hey Bob, could I borrow the picnic table this weekend?');
-
-
