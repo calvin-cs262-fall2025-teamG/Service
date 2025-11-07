@@ -19,47 +19,39 @@ CREATE TABLE "User" (
 
 CREATE TABLE Item (
     item_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL, -- the name and/or description of the item
     image_url VARCHAR(255),
     category VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'available',
-    owner_id INT NOT NULL,
+    status VARCHAR(20) DEFAULT 'available', -- can be available, borrowed, or something else (like missing);
+    owner_id INT NOT NULL, -- the id of thep person lending the item;
     FOREIGN KEY (owner_id) REFERENCES "User"(user_id)
 );
 
 CREATE TABLE BorrowingRequest (
     request_id SERIAL PRIMARY KEY,
-    borrower_id INT NOT NULL,
-    lister_id INT NOT NULL,
-    item_id INT NOT NULL,
-    request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'pending',
+    borrower_id INT NOT NULL, -- who wants to lend the item
+    lister_id INT NOT NULL,   -- who wants to borrow the item
+    item_id INT NOT NULL,     -- which item is being borrowed
+    request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- when the request was made; NOT when the item was picked up by the borrower;
+    status VARCHAR(20) DEFAULT 'pending', -- can be pending, active, or something else;
     FOREIGN KEY (borrower_id) REFERENCES "User"(user_id),
     FOREIGN KEY (lister_id) REFERENCES "User"(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
+-- each BorrowingRequest can be extended by a BorrowingHistory;
 CREATE TABLE BorrowingHistory (
-    request_id INT PRIMARY KEY,
+    request_id INT PRIMARY KEY, -- which request this piece of history is extending
     returned BOOLEAN DEFAULT FALSE,
     return_date DATE,
     FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
 );
 
-CREATE TABLE LendingHistory (
-    history_id SERIAL PRIMARY KEY,
-    lender_id INT NOT NULL,
-    item_id INT NOT NULL,
-    availability_duration INT,
-    FOREIGN KEY (lender_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id)
-);
-
 CREATE TABLE Rating (
     rating_id SERIAL PRIMARY KEY,
-    rater_id INT NOT NULL,
-    ratee_id INT NOT NULL,
-    score INT CHECK (score BETWEEN 1 AND 5),
+    rater_id INT NOT NULL, -- the person giving the rating; i.e. the person who clicks "5 stars";
+    ratee_id INT NOT NULL, -- the person being rated; i.e. their profile displays as "4.2 stars";
+    score INT CHECK (score BETWEEN 1 AND 5), -- 1 to 5 stars;
     date DATE DEFAULT CURRENT_DATE,
     FOREIGN KEY (rater_id) REFERENCES "User"(user_id),
     FOREIGN KEY (ratee_id) REFERENCES "User"(user_id)
@@ -92,7 +84,6 @@ GRANT SELECT ON "User" TO PUBLIC;
 GRANT SELECT ON Item TO PUBLIC;
 GRANT SELECT ON BorrowingRequest TO PUBLIC;
 GRANT SELECT ON BorrowingHistory TO PUBLIC;
-GRANT SELECT ON LendingHistory TO PUBLIC;
 GRANT SELECT ON Rating TO PUBLIC;
 GRANT SELECT ON Bookmark TO PUBLIC;
 GRANT SELECT ON Messages TO PUBLIC;
@@ -120,15 +111,9 @@ INSERT INTO BorrowingRequest (borrower_id, lister_id, item_id, status) VALUES
 (4, 3, 4, 'rejected');
 
 -- Borrowing History
-INSERT INTO BorrowingHistory (request_id,returned, return_date) VALUES
+INSERT INTO BorrowingHistory (request_id, returned, return_date) VALUES
 (1, TRUE, '2025-03-10'),
 (2, FALSE, NULL);
-
--- Lending History
-INSERT INTO LendingHistory (lender_id, item_id, availability_duration) VALUES
-(1, 1, 7),
-(2, 2, 10),
-(3, 4, 5);
 
 -- Ratings
 INSERT INTO Rating (rater_id, ratee_id, score, date) VALUES
