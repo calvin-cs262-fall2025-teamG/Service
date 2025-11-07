@@ -40,13 +40,10 @@ CREATE TABLE BorrowingRequest (
 );
 
 CREATE TABLE BorrowingHistory (
-    history_id SERIAL PRIMARY KEY,
-    borrower_id INT NOT NULL,
-    item_id INT NOT NULL,
+    request_id INT PRIMARY KEY,
     returned BOOLEAN DEFAULT FALSE,
     return_date DATE,
-    FOREIGN KEY (borrower_id) REFERENCES "User"(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id)
+    FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
 );
 
 CREATE TABLE LendingHistory (
@@ -123,9 +120,9 @@ INSERT INTO BorrowingRequest (borrower_id, lister_id, item_id, status) VALUES
 (4, 3, 4, 'rejected');
 
 -- Borrowing History
-INSERT INTO BorrowingHistory (borrower_id, item_id, returned, return_date) VALUES
-(2, 1, TRUE, '2025-03-10'),
-(3, 2, FALSE, NULL);
+INSERT INTO BorrowingHistory (request_id,returned, return_date) VALUES
+(1, TRUE, '2025-03-10'),
+(2, FALSE, NULL);
 
 -- Lending History
 INSERT INTO LendingHistory (lender_id, item_id, availability_duration) VALUES
