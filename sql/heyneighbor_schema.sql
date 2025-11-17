@@ -21,50 +21,48 @@ CREATE TABLE Item (
     name VARCHAR(100) NOT NULL,
     image_url VARCHAR(255),
     category VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'available',
     owner_id INT NOT NULL,
-    FOREIGN KEY (owner_id) REFERENCES app_user(user_id)
+    request_status VARCHAR(20), -- borrowed, available, pending
+    FOREIGN KEY (owner_id) REFERENCES app_user(user_id),
+    -- how long is item available until start - end
+    start_date DATE,
+    end_date DATE
 );
 
 -- Borrowing Requests
 CREATE TABLE BorrowingRequest (
-    request_id SERIAL PRIMARY KEY,
-    borrower_id INT NOT NULL,
-    lister_id INT NOT NULL,
-    item_id INT NOT NULL,
-    request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'pending',
-    FOREIGN KEY (borrower_id) REFERENCES app_user(user_id),
-    FOREIGN KEY (lister_id) REFERENCES app_user(user_id),
+    request_id INT PRIMARY KEY,
+    user_id SERIAL PRIMARY KEY,
+    item_id SERIAL PRIMARY KEY,
+    request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
+    FOREIGN KEY (user_id) REFERENCES app_user(item_id)
 );
 
 -- Borrowing History
 CREATE TABLE BorrowingHistory (
     request_id INT PRIMARY KEY,
-    returned BOOLEAN DEFAULT FALSE,
     return_date DATE,
     FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
 );
 
--- Bookmarks
-CREATE TABLE Bookmark (
-    bookmark_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    item_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES app_user(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id),
-    UNIQUE (user_id, item_id)
-);
+-- Bookmarks (remove this)
+--CREATE TABLE Bookmark (
+    --bookmark_id SERIAL PRIMARY KEY,
+    --user_id INT NOT NULL,
+    --item_id INT NOT NULL,
+    --created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    --FOREIGN KEY (user_id) REFERENCES app_user(user_id),
+   -- FOREIGN KEY (item_id) REFERENCES Item(item_id),
+    --UNIQUE (user_id, item_id)
+--);
 
 -- Messages
 CREATE TABLE Messages (
-    message_id SERIAL PRIMARY KEY,
+    --message_id SERIAL PRIMARY KEY,
     sender_id INT NOT NULL,
     receiver_id INT NOT NULL,
-    item_id INT,
-    content TEXT NOT NULL,
+    --content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES app_user(user_id),
     FOREIGN KEY (receiver_id) REFERENCES app_user(user_id),
