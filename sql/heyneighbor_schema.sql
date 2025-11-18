@@ -46,17 +46,6 @@ CREATE TABLE BorrowingHistory (
     FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
 );
 
--- Bookmarks (remove this)
---CREATE TABLE Bookmark (
-    --bookmark_id SERIAL PRIMARY KEY,
-    --user_id INT NOT NULL,
-    --item_id INT NOT NULL,
-    --created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    --FOREIGN KEY (user_id) REFERENCES app_user(user_id),
-   -- FOREIGN KEY (item_id) REFERENCES Item(item_id),
-    --UNIQUE (user_id, item_id)
---);
-
 -- Messages
 CREATE TABLE Messages (
     --message_id SERIAL PRIMARY KEY,
