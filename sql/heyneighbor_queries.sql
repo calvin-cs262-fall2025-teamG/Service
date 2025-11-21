@@ -1,30 +1,30 @@
 -- hey neighbor sample queries
 
 -- list all users 
-SELECT user_id, name
+SELECT user_id, name, profile_picture
 FROM app_user;
 
 -- show available items with their owners
-SELECT i.item_id, i.name AS item_name, u.name AS owner_name -- to prevent confusion between owner_name and item_name
+SELECT i.item_id, i.name AS item_name, i.category, u.name AS owner_name
 FROM Item i
 JOIN app_user u ON i.owner_id = u.user_id
-WHERE i.status = 'available';
+WHERE i.request_status = 'available';
 
 -- show active borrowing requests
-SELECT br.request_id, u1.name AS borrower, u2.name AS lender, i.name AS item, br.status, br.request_datetime
-FROM BorrowingRequest br
-JOIN app_user u1 ON br.borrower_id = u1.user_id
-JOIN app_user u2 ON br.lister_id = u2.user_id
-JOIN Item i ON br.item_id = i.item_id
-WHERE br.status = 'pending';
+-- (Active = requests for items not yet returned; you can assume return_date IS NULL or `request_status = 'pending')
+SELECT r.request_id, u.name AS requester_name, i.name AS item_name, r.request_datetime
+FROM BorrowingRequest r
+JOIN app_user u ON r.user_id = u.user_id
+JOIN Item i ON r.item_id = i.item_id
+WHERE i.request_status = 'pending';
 
 -- show borrowing history for a specific user (borrower_id = 2)
-SELECT u.name AS borrower, i.name AS item, bh.returned, bh.return_date
-FROM BorrowingHistory bh
-JOIN BorrowingRequest br ON bh.request_id = br.request_id
-JOIN app_user u ON br.borrower_id = u.user_id
-JOIN Item i ON br.item_id = i.item_id
-WHERE br.borrower_id = 2;
+SELECT i.name AS item_name, r.request_datetime, b.return_date
+FROM BorrowingHistory b
+JOIN BorrowingRequest r ON b.request_id = r.request_id
+JOIN Item i ON r.item_id = i.item_id
+WHERE r.user_id = 2;  -- Replace 2 with the specific user_id
+
 
 
 
