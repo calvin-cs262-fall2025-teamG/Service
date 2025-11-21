@@ -18,12 +18,12 @@ JOIN app_user u ON r.user_id = u.user_id
 JOIN Item i ON r.item_id = i.item_id
 WHERE i.request_status = 'pending';
 
--- show borrowing history for a specific user (borrower_id = 2)
+-- show borrowing history for a specific user 
 SELECT i.name AS item_name, r.request_datetime, b.return_date
 FROM BorrowingHistory b
 JOIN BorrowingRequest r ON b.request_id = r.request_id
 JOIN Item i ON r.item_id = i.item_id
-WHERE r.user_id = 2;  -- Replace 2 with the specific user_id
+WHERE r.user_id = 2;  
 
 
 
