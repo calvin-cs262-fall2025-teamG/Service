@@ -2,7 +2,6 @@
 
 -- Drop dependent tables first
 DROP TABLE IF EXISTS Messages;
-DROP TABLE IF EXISTS Bookmark;
 DROP TABLE IF EXISTS BorrowingHistory;
 DROP TABLE IF EXISTS BorrowingRequest;
 DROP TABLE IF EXISTS Item;
@@ -22,7 +21,7 @@ CREATE TABLE Item (
     image_url VARCHAR(255),
     category VARCHAR(50),
     owner_id INT NOT NULL,
-    request_status VARCHAR(20), -- borrowed, available, pending
+    request_status VARCHAR(20) DEFAULT 'available', -- borrowed, available, pending
     FOREIGN KEY (owner_id) REFERENCES app_user(user_id),
     -- how long is item available until start - end
     start_date DATE,
@@ -32,11 +31,11 @@ CREATE TABLE Item (
 -- Borrowing Requests
 CREATE TABLE BorrowingRequest (
     request_id INT PRIMARY KEY,
-    user_id SERIAL PRIMARY KEY,
-    item_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_id INT NOT NULL,
     request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    FOREIGN KEY (user_id) REFERENCES app_user(user_id)
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
-    FOREIGN KEY (user_id) REFERENCES app_user(item_id)
 );
 
 -- Borrowing History
@@ -48,48 +47,37 @@ CREATE TABLE BorrowingHistory (
 
 -- Messages
 CREATE TABLE Messages (
-    --message_id SERIAL PRIMARY KEY,
+    message_id SERIAL PRIMARY KEY,
     sender_id INT NOT NULL,
     receiver_id INT NOT NULL,
-    --content TEXT NOT NULL,
+    content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES app_user(user_id),
     FOREIGN KEY (receiver_id) REFERENCES app_user(user_id),
     FOREIGN KEY (item_id) REFERENCES Item(item_id)
 );
 
--- Grants
-GRANT SELECT ON app_user TO PUBLIC;
-GRANT SELECT ON Item TO PUBLIC;
-GRANT SELECT ON BorrowingRequest TO PUBLIC;
-GRANT SELECT ON BorrowingHistory TO PUBLIC;
-GRANT SELECT ON Bookmark TO PUBLIC;
-GRANT SELECT ON Messages TO PUBLIC;
-
 -- Sample Users
 INSERT INTO app_user (name, profile_picture) VALUES
 ('Alice Johnson', 'alice.jpg'),
 ('Bob Smith', 'bob.jpg'),
-('Charlie Kim', 'charlie.png'),
-('Dana Lee', 'dana.png');
+('Charlie Lee', 'charlie.jpg');
 
 -- Sample Items
-INSERT INTO Item (name, image_url, category, status, owner_id) VALUES
-('Electric Drill', 'drill.jpg', 'Tools', 'available', 1),
-('Picnic Table', 'table.jpg', 'Outdoor', 'borrowed', 2),
-('Lawn Mower', 'mower.jpg', 'Garden', 'available', 2),
-('Tent', 'tent.jpg', 'Camping', 'available', 3);
+INSERT INTO Item (name, image_url, category, owner_id, request_status, start_date, end_date) VALUES
+('Lawn Mower', 'lawnmower.jpg', 'Tools', 1, 'available', '2025-11-20', '2025-12-20'),
+('Tent', 'tent.jpg', 'Outdoor', 2, 'available', '2025-11-21', '2025-12-10'),
+('Drill', 'drill.jpg', 'Tools', 3, 'available', '2025-11-22', '2025-12-15');
 
 -- Borrowing Requests
-INSERT INTO BorrowingRequest (borrower_id, lister_id, item_id, status) VALUES
-(2, 1, 1, 'approved'),
-(3, 2, 2, 'pending'),
-(4, 3, 4, 'rejected');
+INSERT INTO BorrowingRequest (user_id, item_id, request_datetime) VALUES
+(2, 1, '2025-11-20 10:00:00'), -- Bob requests Alice's lawn mower
+(3, 2, '2025-11-21 14:30:00'); -- Charlie requests Bob's tent
 
 -- Borrowing History
-INSERT INTO BorrowingHistory (request_id, returned, return_date) VALUES
-(1, TRUE, '2025-03-10'),
-(2, FALSE, NULL);
+INSERT INTO BorrowingHistory (request_id, return_date) VALUES
+(1, '2025-12-01'), -- Bob returned the lawn mower
+(2, NULL);         -- Charlie has not returned the tent yet
 
 -- Bookmarks
 INSERT INTO Bookmark (user_id, item_id) VALUES
@@ -98,7 +86,8 @@ INSERT INTO Bookmark (user_id, item_id) VALUES
 (3, 1);
 
 -- Messages
-INSERT INTO Messages (sender_id, receiver_id, item_id, content) VALUES
-(2, 1, 1, 'Hi Alice, is the drill still available?'),
-(1, 2, 1, 'Yes, you can borrow it anytime this week!'),
-(3, 2, 2, 'Hey Bob, could I borrow the picnic table this weekend?');
+INSERT INTO Messages (sender_id, receiver_id, item_id, content, sent_at) VALUES
+(2, 1, 1, 'Hi Alice, can I borrow your lawn mower this weekend?', '2025-11-20 10:05:00'),
+(1, 2, 1, 'Sure Bob, you can pick it up on Saturday.', '2025-11-20 10:10:00'),
+(3, 2, 2, 'Hey Bob, is the tent available for next week?', '2025-11-21 14:35:00');
+
