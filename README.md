@@ -4,3 +4,5 @@
 
 # Service
 Contains data service applications
+
+Default domain: heyneighborurl-e3a2eehmd5awgwbd.centralus-01.azurewebsites.net
