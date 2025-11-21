@@ -85,9 +85,3 @@ INSERT INTO Messages (sender_id, receiver_id, item_id, content, sent_at) VALUES
 (1, 2, 1, 'Sure Bob, you can pick it up on Saturday.', '2025-11-20 10:10:00'),
 (3, 2, 2, 'Hey Bob, is the tent available for next week?', '2025-11-21 14:35:00');
 
--- Bookmark
-INSERT INTO Bookmark (user_id, item_id) VALUES
-(1, 2),
-(2, 3),
-(3, 1);
-
