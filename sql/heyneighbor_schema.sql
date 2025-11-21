@@ -18,6 +18,7 @@ CREATE TABLE app_user (
 CREATE TABLE Item (
     item_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
     image_url VARCHAR(255),
     category VARCHAR(50),
     owner_id INT NOT NULL,
@@ -64,10 +65,10 @@ INSERT INTO app_user (name, profile_picture) VALUES
 ('Charlie Lee', 'charlie.jpg');
 
 -- Items
-INSERT INTO Item (name, image_url, category, owner_id, request_status, start_date, end_date) VALUES
-('Lawn Mower', 'lawnmower.jpg', 'Tools', 1, 'available', '2025-11-20', '2025-12-20'),
-('Tent', 'tent.jpg', 'Outdoor', 2, 'available', '2025-11-21', '2025-12-10'),
-('Drill', 'drill.jpg', 'Tools', 3, 'available', '2025-11-22', '2025-12-15');
+INSERT INTO Item (name,description, image_url, category, owner_id, request_status, start_date, end_date) VALUES
+('Lawn Mower', 'hard to start sometimes but works well','lawnmower.jpg','Tools', 1, 'available', '2025-11-20', '2025-12-20'),
+('Tent', 'great for bagpacking, enough for 3 people','tent.jpg', 'Outdoor', 2, 'available', '2025-11-21', '2025-12-10'),
+('Drill', 'Works great!', 'drill.jpg', 'Tools', 3, 'available', '2025-11-22', '2025-12-15');
 
 -- Borrowing Requests
 INSERT INTO BorrowingRequest (user_id, item_id, request_datetime) VALUES
