@@ -1,29 +1,28 @@
 {
-  "dependencies": {
-    "expo": "^54.0.25",
-    "express": "^5.2.0",
-    "pg": "^8.16.3",
-    "pg-promise": "^12.3.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.5"
-  },
-  "name": "service",
-  "version": "1.0.0",
-  "description": "* [Project](https://github.com/calvin-cs262-fall2025-teamG/Project) * [Client](https://github.com/calvin-cs262-fall2025-teamG/Client)",
-  "main": "index.js",
-  "scripts": {
-    "test": "exit 0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/calvin-cs262-fall2025-teamG/Service.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/calvin-cs262-fall2025-teamG/Service/issues"
-  },
-  "homepage": "https://github.com/calvin-cs262-fall2025-teamG/Service#readme"
+    "name": "cs262-webservice",
+    "version": "1.0.0",
+    "description": "CS 262 Web service",
+    "main": "src/monopolyService.ts",
+    "type": "module",
+    "author": "kvlinden",
+    "license": "ISC",
+    "engines": {
+        "node": "22.x"
+    },
+    "scripts": {
+        "start": "node --experimental-strip-types src/heyNeighborService.ts",
+        "type-check": "tsc --noEmit",
+        "lint": "eslint ."
+    },
+    "dependencies": {
+        "express": "5.x",
+        "pg-promise": "11.x"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/node": "^20.19.8",
+        "@typescript-eslint/eslint-plugin": "^8.36.0",
+        "@typescript-eslint/parser": "^8.36.0",
+        "eslint": "9.x"
+    }
 }
