@@ -4,6 +4,7 @@ This project implements the backend data service for the **HeyNeighbor** app.
 It is a Node.js + TypeScript service that connects to an Azure-hosted PostgreSQL database.
 
 ## 📁 Project Structure
+```
 Service/
  ├── sql/
  │    ├── heyneighbor_schema.sql      # Database schema
@@ -22,7 +23,7 @@ Service/
  ├── package-lock.json
  ├── .gitignore
  ├── README.md
-
+```
 
 ## ⚙️ Setup
 
@@ -33,12 +34,14 @@ npm install
 
 ### 2. Environment variables
 Create a .env file (ignored by Git) with your Azure Postgres credentials:
+```
 DB_SERVER=your-server.postgres.database.azure.com
 DB_PORT=5432
 DB_DATABASE=postgres
 DB_USER=your-username
 DB_PASSWORD=your-password
 NODE_ENV=production
+```
 
 ### 🚀 Running the Service
 REST API service
