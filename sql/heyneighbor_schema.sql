@@ -1,18 +1,22 @@
--- heyneighbor_schema.sql
 -- Drop all tables (clean slate)
 DROP TABLE IF EXISTS Messages CASCADE;
-DROP TABLE IF EXISTS BorrowingHistory CASCADE;
-DROP TABLE IF EXISTS BorrowingRequest CASCADE;
 DROP TABLE IF EXISTS Item CASCADE;
 DROP TABLE IF EXISTS app_user CASCADE;
 
-
 -- Users
 CREATE TABLE app_user (
-    user_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    profile_picture VARCHAR(255)
+  user_id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  avatar_url VARCHAR(500),
+  rating DECIMAL(2,1) DEFAULT 0.0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Index for faster email lookups
+CREATE INDEX idx_users_email ON app_user(email);
 
 -- Items
 CREATE TABLE Item (
@@ -22,30 +26,12 @@ CREATE TABLE Item (
     image_url VARCHAR(255),
     category VARCHAR(50),
     owner_id INT NOT NULL,
-    request_status VARCHAR(20) DEFAULT 'available', -- borrowed, available, pending
-    start_date DATE,
-    end_date DATE,
-    FOREIGN KEY (owner_id) REFERENCES app_user(user_id)
+    status VARCHAR(20) DEFAULT 'available', -- 'available' or 'borrowed'
+    created_at TIMESTAMP DEFAULT NOW(),
+    FOREIGN KEY (owner_id) REFERENCES app_user(user_id) ON DELETE CASCADE
 );
 
--- Borrowing Requests
-CREATE TABLE BorrowingRequest (
-    request_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    item_id INT NOT NULL,
-    request_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES app_user(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id)
-);
-
--- Borrowing History
-CREATE TABLE BorrowingHistory (
-    request_id INT PRIMARY KEY,
-    return_date DATE,
-    FOREIGN KEY (request_id) REFERENCES BorrowingRequest(request_id)
-);
-
--- Messages
+-- Messages (for chat coordination)
 CREATE TABLE Messages (
     message_id SERIAL PRIMARY KEY,
     sender_id INT NOT NULL,
@@ -53,36 +39,28 @@ CREATE TABLE Messages (
     item_id INT, -- optional: message about a specific item
     content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sender_id) REFERENCES app_user(user_id),
-    FOREIGN KEY (receiver_id) REFERENCES app_user(user_id),
-    FOREIGN KEY (item_id) REFERENCES Item(item_id)
+    FOREIGN KEY (sender_id) REFERENCES app_user(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES app_user(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES Item(item_id) ON DELETE SET NULL
 );
 
--- Users
-INSERT INTO app_user (name, profile_picture) VALUES
-('Alice Johnson', 'alice.jpg'),
-('Bob Smith', 'bob.jpg'),
-('Charlie Lee', 'charlie.jpg');
+-- Sample Users
+INSERT INTO app_user (email, name, password_hash) VALUES
+('alice@calvin.edu', 'Alice Johnson', '$2b$10$dummyhash1'),
+('bob@calvin.edu', 'Bob Smith', '$2b$10$dummyhash2'),
+('charlie@calvin.edu', 'Charlie Lee', '$2b$10$dummyhash3');
 
--- Items
-INSERT INTO Item (name,description, image_url, category, owner_id, request_status, start_date, end_date) VALUES
-('Lawn Mower', 'hard to start sometimes but works well','lawnmower.jpg','Tools', 1, 'available', '2025-11-20', '2025-12-20'),
-('Tent', 'great for bagpacking, enough for 3 people','tent.jpg', 'Outdoor', 2, 'available', '2025-11-21', '2025-12-10'),
-('Drill', 'Works great!', 'drill.jpg', 'Tools', 3, 'available', '2025-11-22', '2025-12-15');
+-- Sample Items
+INSERT INTO Item (name, description, image_url, category, owner_id, status) VALUES
+('Lawn Mower', 'Hard to start sometimes but works well', 'lawnmower.jpg', 'Tools', 1, 'available'),
+('Tent', 'Great for backpacking, enough for 3 people', 'tent.jpg', 'Outdoor', 2, 'borrowed'),
+('Drill', 'Works great!', 'drill.jpg', 'Tools', 3, 'available'),
+('USB-C Charger', 'Fast charging cable', 'charger.jpg', 'Electronics', 1, 'available'),
+('Camping Stove', 'Portable gas stove', 'stove.jpg', 'Outdoor', 2, 'available');
 
--- Borrowing Requests
-INSERT INTO BorrowingRequest (user_id, item_id, request_datetime) VALUES
-(2, 1, '2025-11-20 10:00:00'), -- Bob requests Alice's lawn mower
-(3, 2, '2025-11-21 14:30:00'); -- Charlie requests Bob's tent
-
--- Borrowing History
-INSERT INTO BorrowingHistory (request_id, return_date) VALUES
-(1, '2025-12-01'), -- Bob returned the lawn mower
-(2, NULL);         -- Charlie has not returned the tent yet
-
--- Messages
+-- Sample Messages
 INSERT INTO Messages (sender_id, receiver_id, item_id, content, sent_at) VALUES
 (2, 1, 1, 'Hi Alice, can I borrow your lawn mower this weekend?', '2025-11-20 10:05:00'),
 (1, 2, 1, 'Sure Bob, you can pick it up on Saturday.', '2025-11-20 10:10:00'),
-(3, 2, 2, 'Hey Bob, is the tent available for next week?', '2025-11-21 14:35:00');
-
+(3, 2, 2, 'Hey Bob, is the tent available for next week?', '2025-11-21 14:35:00'),
+(2, 3, 2, 'Sorry Charlie, it''s currently borrowed. I''ll message you when it''s back!', '2025-11-21 15:00:00');
