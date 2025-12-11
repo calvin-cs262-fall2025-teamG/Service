@@ -41,10 +41,10 @@ CREATE TABLE Messages (
 );
 
 -- Sample Users (with hashed passwords for 'password123')
-INSERT INTO app_user (email, name, password_hash, rating) VALUES
-('alice@calvin.edu', 'Alice Johnson', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv', 4.8),
-('bob@calvin.edu', 'Bob Smith', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv', 4.5),
-('charlie@calvin.edu', 'Charlie Lee', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv', 5.0);
+INSERT INTO app_user (email, name, password_hash) VALUES
+('alice@calvin.edu', 'Alice Johnson', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv'),
+('bob@calvin.edu', 'Bob Smith', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv'),
+('charlie@calvin.edu', 'Charlie Lee', '$2b$10$rZ1qH4xqVxKxZvY8YvY8YO8YvY8YvY8YvY8YvY8YvY8YvY8Yv');
 
 -- Sample Items
 INSERT INTO Item (name, description, image_url, category, owner_id, status) VALUES
