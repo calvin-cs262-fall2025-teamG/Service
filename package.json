@@ -15,10 +15,12 @@
         "lint": "eslint ."
     },
     "dependencies": {
+        "bcrypt": "^6.0.0",
         "express": "5.x",
         "pg-promise": "11.x"
     },
     "devDependencies": {
+        "@types/bcrypt": "^6.0.0",
         "@types/express": "^4.17.21",
         "@types/node": "^20.19.8",
         "@typescript-eslint/eslint-plugin": "^8.36.0",
