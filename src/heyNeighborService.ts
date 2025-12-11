@@ -16,7 +16,6 @@ import pgPromise from 'pg-promise';
 import type { Request, Response, NextFunction } from 'express';
 import type { User, UserInput } from './types/user.js';
 import type { Item, ItemInput } from './types/item.js';
-import type { BorrowingRequestInput } from './types/borrowingrequest.js';
 import type { MessageInput } from './types/messages.js';
 
 // ----------------------------------------------
@@ -58,10 +57,6 @@ router.get("/items", readItems);
 router.get("/items/:id", readItem);
 router.post("/items", createItem);
 
-// ===== Borrowing Requests =====
-router.get("/borrow/active", readActiveBorrowRequests);
-router.post("/borrow", createBorrowRequest);
-
 // ===== Messages =====
 router.get("/messages", readMessages);
 router.post("/messages", createMessage);
@@ -94,23 +89,30 @@ function returnDataOr404(res: Response, data: unknown): void {
 // User Endpoints
 // ----------------------------------------------
 function readUsers(_req: Request, res: Response, next: NextFunction): void {
-    db.manyOrNone("SELECT * FROM App_User")
+    db.manyOrNone("SELECT user_id, email, name, avatar_url, created_at FROM app_user")
         .then((data: User[]) => res.send(data))
         .catch(next);
 }
 
 function readUser(req: Request, res: Response, next: NextFunction): void {
-    db.oneOrNone("SELECT * FROM App_User WHERE user_id = ${id}", req.params)
+    db.oneOrNone("SELECT user_id, email, name, avatar_url, created_at FROM app_user WHERE user_id = $1", [req.params.id])
         .then((data: User | null) => returnDataOr404(res, data))
         .catch(next);
 }
 
 function createUser(req: Request, res: Response, next: NextFunction): void {
+    const { email, name, password_hash, avatar_url } = req.body;
+
+    if (!email || !name || !password_hash) {
+        res.status(400).json({ error: "Missing required fields: email, name, or password_hash" });
+        return;
+    }
+
     db.one(
-        "INSERT INTO App_User(name, profile_picture) VALUES(${name}, ${profile_picture}) RETURNING user_id",
-        req.body as UserInput
+        "INSERT INTO app_user(email, name, password_hash, avatar_url) VALUES($1, $2, $3, $4) RETURNING user_id, email, name, avatar_url, created_at",
+        [email, name, password_hash, avatar_url || null]
     )
-        .then((data: { user_id: number }) => res.send(data))
+        .then((data: User) => res.status(201).json(data))
         .catch(next);
 }
 
@@ -118,52 +120,50 @@ function createUser(req: Request, res: Response, next: NextFunction): void {
 // Item Endpoints
 // ----------------------------------------------
 function readItems(_req: Request, res: Response, next: NextFunction): void {
-    db.manyOrNone("SELECT * FROM Item")
-        .then((data: Item[]) => res.send(data))
+    const query = `
+        SELECT i.*, 
+               u.name AS owner_name, 
+               u.email AS owner_email, 
+               u.avatar_url AS owner_avatar
+        FROM Item i
+        JOIN app_user u ON i.owner_id = u.user_id
+        ORDER BY i.created_at DESC
+    `;
+    db.manyOrNone(query)
+        .then((data: Item[]) => res.json(data))
         .catch(next);
 }
 
 function readItem(req: Request, res: Response, next: NextFunction): void {
-    db.oneOrNone("SELECT * FROM Item WHERE item_id = ${id}", req.params)
+    const query = `
+        SELECT i.*, 
+               u.name AS owner_name, 
+               u.email AS owner_email, 
+               u.avatar_url AS owner_avatar
+        FROM Item i
+        JOIN app_user u ON i.owner_id = u.user_id
+        WHERE i.item_id = $1
+    `;
+    db.oneOrNone(query, [req.params.id])
         .then((data: Item | null) => returnDataOr404(res, data))
         .catch(next);
 }
 
 function createItem(req: Request, res: Response, next: NextFunction): void {
+    const { name, description, image_url, category, owner_id, status } = req.body;
+
+    if (!name || !owner_id) {
+        res.status(400).json({ error: "Missing required fields: name or owner_id" });
+        return;
+    }
+
     db.one(
-        `INSERT INTO Item(name, description, image_url, category, owner_id, request_status, start_date, end_date)
-         VALUES (\${name}, \${description}, \${image_url}, \${category}, \${owner_id}, \${request_status}, \${start_date}, \${end_date})
-         RETURNING item_id`,
-        req.body as ItemInput
+        `INSERT INTO Item(name, description, image_url, category, owner_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING item_id, name, description, image_url, category, owner_id, status, created_at`,
+        [name, description || null, image_url || null, category || null, owner_id, status || "available"]
     )
-        .then((data: { item_id: number }) => res.send(data))
-        .catch(next);
-}
-
-
-// ----------------------------------------------
-// Borrowing Requests
-// ----------------------------------------------
-function readActiveBorrowRequests(_req: Request, res: Response, next: NextFunction): void {
-    const query = `
-        SELECT r.request_id, u.name AS requester, i.name AS item, r.request_datetime
-        FROM BorrowingRequest r
-        JOIN App_User u ON r.user_id = u.user_id
-        JOIN Item i ON r.item_id = i.item_id
-        WHERE i.request_status = 'pending'
-    `;
-
-    db.manyOrNone(query)
-        .then((data) => res.send(data))
-        .catch(next);
-}
-
-function createBorrowRequest(req: Request, res: Response, next: NextFunction): void {
-    db.one(
-        "INSERT INTO BorrowingRequest(user_id, item_id) VALUES(${user_id}, ${item_id}) RETURNING request_id",
-        req.body as BorrowingRequestInput
-    )
-        .then((data: { request_id: number }) => res.send(data))
+        .then((data: Item) => res.status(201).json(data))
         .catch(next);
 }
 
@@ -171,18 +171,35 @@ function createBorrowRequest(req: Request, res: Response, next: NextFunction): v
 // Messages
 // ----------------------------------------------
 function readMessages(_req: Request, res: Response, next: NextFunction): void {
-    db.manyOrNone("SELECT * FROM Messages ORDER BY sent_at")
-        .then((rows) => res.send(rows))
+    const query = `
+        SELECT m.*, 
+               sender.name AS sender_name, 
+               sender.avatar_url AS sender_avatar,
+               receiver.name AS receiver_name
+        FROM Messages m
+        JOIN app_user sender ON m.sender_id = sender.user_id
+        JOIN app_user receiver ON m.receiver_id = receiver.user_id
+        ORDER BY m.sent_at DESC
+    `;
+    db.manyOrNone(query)
+        .then((rows) => res.json(rows))
         .catch(next);
 }
 
 function createMessage(req: Request, res: Response, next: NextFunction): void {
+    const { sender_id, receiver_id, item_id, content } = req.body;
+
+    if (!sender_id || !receiver_id || !content) {
+        res.status(400).json({ error: "Missing required fields: sender_id, receiver_id, or content" });
+        return;
+    }
+
     db.one(
         `INSERT INTO Messages(sender_id, receiver_id, item_id, content)
-         VALUES (\${sender_id}, \${receiver_id}, \${item_id}, \${content})
-         RETURNING message_id`,
-        req.body as MessageInput
+         VALUES ($1, $2, $3, $4)
+         RETURNING message_id, sender_id, receiver_id, item_id, content, sent_at`,
+        [sender_id, receiver_id, item_id || null, content]
     )
-        .then((data: { message_id: number }) => res.send(data))
+        .then((data) => res.status(201).json(data))
         .catch(next);
 }
