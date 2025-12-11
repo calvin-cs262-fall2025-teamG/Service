@@ -64,11 +64,74 @@ router.post("/messages", createMessage);
 
 // ===== Authentication =====
 router.post("/auth/signup", async (req: Request, res: Response, next: NextFunction) => {
-    // Signup logic here
+    const { email, password, name } = req.body;
+
+    if (!email || !password || !name) {
+        res.status(400).json({ error: "Missing required fields: email, password, or name" });
+        return;
+    }
+
+    try {
+        // Check if the user already exists
+        const existingUser = await db.oneOrNone("SELECT user_id FROM app_user WHERE email = $1", [email]);
+        if (existingUser) {
+            res.status(409).json({ error: "Email is already registered" });
+            return;
+        }
+
+        // Hash the password
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Insert the user into the database
+        const user = await db.one(
+            `INSERT INTO app_user (email, name, password_hash, avatar_url, created_at)
+             VALUES ($1, $2, $3, $4, NOW())
+             RETURNING user_id, email, name, avatar_url, created_at`,
+            [email, name, passwordHash, null]
+        );
+
+        res.status(201).json({ user });
+    } catch (error) {
+        console.error("Signup error:", error);
+        next(error);
+    }
 });
 
 router.post("/auth/login", async (req: Request, res: Response, next: NextFunction) => {
-    // Login logic here
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        res.status(400).json({ error: "Missing required fields: email or password" });
+        return;
+    }
+
+    try {
+        // Find the user by email
+        const user = await db.oneOrNone(
+            "SELECT user_id, email, name, password_hash, avatar_url, created_at FROM app_user WHERE email = $1",
+            [email]
+        );
+
+        if (!user) {
+            res.status(401).json({ error: "Invalid email or password" });
+            return;
+        }
+
+        // Compare the provided password with the stored hash
+        const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+        if (!isPasswordValid) {
+            res.status(401).json({ error: "Invalid email or password" });
+            return;
+        }
+
+        // Exclude the password hash from the response
+        const { password_hash, ...userWithoutPassword } = user;
+
+        res.json({ user: userWithoutPassword });
+    } catch (error) {
+        console.error("Login error:", error);
+        next(error);
+    }
 });
 
 app.use(router);
@@ -214,74 +277,3 @@ function createMessage(req: Request, res: Response, next: NextFunction): void {
         .catch(next);
 }
 
-// ===== Authentication =====
-router.post("/auth/signup", async (req: Request, res: Response, next: NextFunction) => {
-    const { email, password, name } = req.body;
-
-    if (!email || !password || !name) {
-        res.status(400).json({ error: "Missing required fields: email, password, or name" });
-        return;
-    }
-
-    try {
-        // Check if the user already exists
-        const existingUser = await db.oneOrNone("SELECT user_id FROM app_user WHERE email = $1", [email]);
-        if (existingUser) {
-            res.status(409).json({ error: "Email is already registered" });
-            return;
-        }
-
-        // Hash the password
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        // Insert the user into the database
-        const user = await db.one(
-            `INSERT INTO app_user (email, name, password_hash, avatar_url, created_at)
-             VALUES ($1, $2, $3, $4, NOW())
-             RETURNING user_id, email, name, avatar_url, created_at`,
-            [email, name, passwordHash, null]
-        );
-
-        res.status(201).json({ user });
-    } catch (error) {
-        console.error("Signup error:", error);
-        next(error);
-    }
-});
-
-router.post("/auth/login", async (req: Request, res: Response, next: NextFunction) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        res.status(400).json({ error: "Missing required fields: email or password" });
-        return;
-    }
-
-    try {
-        // Find the user by email
-        const user = await db.oneOrNone(
-            "SELECT user_id, email, name, password_hash, avatar_url, created_at FROM app_user WHERE email = $1",
-            [email]
-        );
-
-        if (!user) {
-            res.status(401).json({ error: "Invalid email or password" });
-            return;
-        }
-
-        // Compare the provided password with the stored hash
-        const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-        if (!isPasswordValid) {
-            res.status(401).json({ error: "Invalid email or password" });
-            return;
-        }
-
-        // Exclude the password hash from the response
-        const { password_hash, ...userWithoutPassword } = user;
-
-        res.json({ user: userWithoutPassword });
-    } catch (error) {
-        console.error("Login error:", error);
-        next(error);
-    }
-});
