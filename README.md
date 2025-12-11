@@ -12,7 +12,6 @@ Service/
  │
  ├── src/
  │    ├── types/                      # Type definitions for all DB entities
- │    │     ├── borrowingrequest.ts
  │    │     ├── item.ts
  │    │     ├── messages.ts
  │    │     ├── user.ts
@@ -70,11 +69,6 @@ npm start
 | GET    | `/items/:id` | Get item by ID    |
 | POST   | `/items`     | Create a new item |
 
-**🔄 Borrowing Requests**
-| Method | Endpoint         | Description                       |
-| ------ | ---------------- | --------------------------------- |
-| GET    | `/borrow/active` | Get all active borrowing requests |
-| POST   | `/borrow`        | Create a new borrowing request    |
 
 **💬 Messages**
 | Method | Endpoint    | Description          |
