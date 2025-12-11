@@ -66,23 +66,27 @@ router.post("/messages", createMessage);
 router.post("/auth/signup", async (req: Request, res: Response, next: NextFunction) => {
     const { email, password, name } = req.body;
 
+    console.log("Signup Request Body:", req.body); // Log the request body
+
     if (!email || !password || !name) {
+        console.log("Missing fields in request body");
         res.status(400).json({ error: "Missing required fields: email, password, or name" });
         return;
     }
 
     try {
-        // Check if the user already exists
+        console.log("Checking if user exists...");
         const existingUser = await db.oneOrNone("SELECT user_id FROM app_user WHERE email = $1", [email]);
         if (existingUser) {
+            console.log("User already exists:", existingUser);
             res.status(409).json({ error: "Email is already registered" });
             return;
         }
 
-        // Hash the password
+        console.log("Hashing password...");
         const passwordHash = await bcrypt.hash(password, 10);
 
-        // Insert the user into the database
+        console.log("Inserting user into database...");
         const user = await db.one(
             `INSERT INTO app_user (email, name, password_hash, avatar_url, created_at)
              VALUES ($1, $2, $3, $4, NOW())
@@ -90,9 +94,10 @@ router.post("/auth/signup", async (req: Request, res: Response, next: NextFuncti
             [email, name, passwordHash, null]
         );
 
+        console.log("User created successfully:", user);
         res.status(201).json({ user });
     } catch (error) {
-        console.error("Signup error:", error);
+        console.error("Signup error:", error); // Log the error
         next(error);
     }
 });
