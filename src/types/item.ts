@@ -5,9 +5,12 @@ export interface Item {
   image_url: string | null;
   category: string | null;
   owner_id: number;
-  request_status: "available" | "borrowed" | "pending";
-  start_date: string | null;
-  end_date: string | null;
+  status: "available" | "borrowed"; 
+  created_at: string;
+  // Owner info from JOIN queries
+  owner_name?: string;
+  owner_email?: string;
+  owner_avatar?: string | null;
 }
 
 export interface ItemInput {
@@ -16,7 +19,5 @@ export interface ItemInput {
   image_url?: string | null;
   category?: string | null;
   owner_id: number;
-  request_status?: "available" | "borrowed" | "pending";
-  start_date?: string | null;
-  end_date?: string | null;
+  status?: "available" | "borrowed"; 
 }
