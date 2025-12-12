@@ -20,3 +20,8 @@ export interface ItemInput {
   start_date?: string | null;
   end_date?: string | null;
 }
+
+export interface ItemWithOwner extends Item {
+  owner_name: string | null;
+  owner_avatar: string | null;
+}
