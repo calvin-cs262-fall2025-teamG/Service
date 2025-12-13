@@ -3,7 +3,6 @@ export interface User {
   name: string;
   email?: string;
   profile_picture?: string;
-  rating?: number;
   verification_token?: string;
   is_verified?: boolean;
   token_expires_at?: Date;       

@@ -1,13 +1,15 @@
 /**
  * HeyNeighbor REST-inspired web service
+ * 
+ * Features:
+ * - Calvin-only authentication with email verification
+ * - User profiles with image upload
+ * - Item listings with CRUD operations
+ * - Messaging system between users
+ * - Borrowing request tracking
  *
- * - Written in TypeScript with Node type-stripping (Node 22+)
- * - Uses pgPromise with built-in SQL injection protection
- * - Has CRUD endpoints for User, Item, BorrowingRequest, Messages
- * - Follows same structure as monopolyService.ts
- *
- * @author:
- * @date: Fall 2025
+ * @author: Maham Abrar, Bryn Lamppa
+ * @date: Fall 2024
  */
 import "dotenv/config";
 
@@ -42,7 +44,7 @@ const db = pgp({
 });
 
 // ----------------------------------------------
-// Email Setup
+// Email Configuration & Helpers
 // ----------------------------------------------
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -52,20 +54,30 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+/**
+ * Generates a random 6-digit verification code
+ * @returns 6-digit string code
+ */
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+/**
+ * Sends verification email with 6-digit code
+ * @param email - Recipient's Calvin email address
+ * @param code - 6-digit verification code
+ * @param name - Recipient's name for personalization
+ */
 async function sendVerificationEmail(email: string, code: string, name: string) {
   const mailOptions = {
-    from: `"Hey, Nieghbor!" <${process.env.EMAIL_USER}>`,
+    from: `"Hey, Neighbor!" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: 'Verify Your Calvin Email',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #f97316;">Welcome to Hey, Neighbor!</h1>
         <p>Hi ${name},</p>
-        <p>Thank you for signing up! Please use the verification code below to complete your registration.</p>
+        <p>Thank you for signing up! Please use the verification code below to complete your registration and join Calvin's sharing community.</p>
         <div style="background-color: #f3f4f6; padding: 20px; margin: 30px 0; text-align: center; border-radius: 8px;">
           <h2 style="color: #f97316; font-size: 32px; letter-spacing: 8px; margin: 0;">${code}</h2>
         </div>
@@ -120,9 +132,10 @@ const upload = multer({
   }
 });
 
-// Serve uploaded files
+// Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
 
+// Parse JSON request bodies
 router.use(express.json());
 
 // ----------------------------------------------
@@ -134,20 +147,20 @@ router.get("/", (_req, res) => {
   res.send("Hello from HeyNeighbor API!");
 });
 
-// ===== Auth =====
+// ===== Authentication Routes =====
 router.post("/auth/signup", signup);
 router.post("/auth/login", login);
 router.post("/auth/verify-code", verifyEmailCode);
 router.post("/auth/resend-verification", resendVerification);
 
-// ===== Users =====
+// ===== User Routes =====
 router.get("/users", readUsers);
 router.get("/users/:id", readUser);
 router.post("/users", createUser);
 router.put("/users/:id", updateUser);
 router.post("/users/:id/profile-picture", upload.single('photo'), uploadProfilePicture);
 
-// ===== Items =====
+// ===== Item Routes =====
 router.get("/items", readItems);
 router.get("/items/:id", readItem);
 router.post("/items", createItem);
@@ -155,31 +168,20 @@ router.post("/items/upload", upload.single('photo'), uploadItemImage);
 router.put("/items/:id", updateItem);
 router.delete("/items/:id", deleteItem);
 
-// ===== Borrowing Requests =====
+// ===== Borrowing Request Routes =====
 router.get("/borrow/active", readActiveBorrowRequests);
 router.post("/borrow", createBorrowRequest);
 
-// ===== Messages =====
+// ===== Message Routes =====
 router.get("/messages", readMessages);
 router.get("/messages/user/:userId", readUserMessages);
 router.post("/messages", createMessage);
 
-app.use(router);
-
-// Error Handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Error:", err.message);
-  console.error("Stack:", err.stack);
-  res.status(500).json({ error: "Internal server error" });
-});
-
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Listening on http://0.0.0.0:${port}`);
-});
-
+// ===== Development/Testing Routes =====
+// TODO: Remove before production deployment
 router.get("/test-email", async (req, res) => {
   try {
-    await sendVerificationEmail("YOUR_CALVIN_EMAIL@calvin.edu", "123456", "Test User");
+    await sendVerificationEmail("test@calvin.edu", "123456", "Test User");
     res.json({ success: true, message: "Email sent! Check your inbox." });
   } catch (error: any) {
     console.error("Email error:", error);
@@ -187,9 +189,29 @@ router.get("/test-email", async (req, res) => {
   }
 });
 
+app.use(router);
+
+// Global error handler
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Error:", err.message);
+  console.error("Stack:", err.stack);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+// Start server
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Listening on http://0.0.0.0:${port}`);
+});
+
 // ----------------------------------------------
-// Utility
+// Utility Functions
 // ----------------------------------------------
+
+/**
+ * Helper to return data or 404 if null
+ * @param res - Express response object
+ * @param data - Data to return or null
+ */
 function returnDataOr404(res: Response, data: unknown): void {
   if (data == null) {
     res.sendStatus(404);
@@ -199,8 +221,16 @@ function returnDataOr404(res: Response, data: unknown): void {
 }
 
 // ----------------------------------------------
-// Auth Endpoints
+// Authentication Handlers
 // ----------------------------------------------
+
+/**
+ * Handles user signup with Calvin email verification
+ * - Validates @calvin.edu email domain
+ * - Generates 6-digit code with 15-min expiration
+ * - Sends verification email
+ * - Creates unverified user account
+ */
 function signup(req: Request, res: Response, next: NextFunction): void {
   const { email, name } = req.body as AuthSignupInput;
 
@@ -209,14 +239,13 @@ function signup(req: Request, res: Response, next: NextFunction): void {
     return;
   }
 
-  // Check if email ends with @calvin.edu
+  // Only allow Calvin College email addresses
   if (!email.endsWith('@calvin.edu')) {
     res.status(400).json({ error: "Must use a Calvin College email address (@calvin.edu)" });
     return;
   }
 
   const verificationCode = generateVerificationCode();
-  const tokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // Use ISO string for UTC
 
   db.oneOrNone("SELECT * FROM app_user WHERE email = $[email]", { email })
     .then((existing: User | null) => {
@@ -225,10 +254,11 @@ function signup(req: Request, res: Response, next: NextFunction): void {
         return null;
       }
 
+      // Create user with verification code (expires in 15 minutes)
       return db.one(
         `INSERT INTO app_user (email, name, verification_token, is_verified, token_expires_at) 
-   VALUES ($[email], $[name], $[verificationCode], false, NOW() + INTERVAL '15 minutes') 
-   RETURNING *`,
+         VALUES ($[email], $[name], $[verificationCode], false, NOW() + INTERVAL '15 minutes') 
+         RETURNING *`,
         { email, name, verificationCode }
       );
     })
@@ -250,6 +280,12 @@ function signup(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Handles user login
+ * - Checks if user exists
+ * - Verifies email is confirmed
+ * - Returns user data on success
+ */
 function login(req: Request, res: Response, next: NextFunction): void {
   const { email } = req.body as AuthLoginInput;
 
@@ -265,6 +301,7 @@ function login(req: Request, res: Response, next: NextFunction): void {
         return;
       }
 
+      // Check if email is verified
       if (!user.is_verified) {
         res.status(403).json({
           error: "Email not verified. Please check your inbox for the verification code.",
@@ -279,6 +316,12 @@ function login(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Verifies user's email with 6-digit code
+ * - Checks code validity and expiration
+ * - Marks user as verified
+ * - Clears verification token
+ */
 function verifyEmailCode(req: Request, res: Response, next: NextFunction): void {
   const { email, code } = req.body;
 
@@ -287,6 +330,7 @@ function verifyEmailCode(req: Request, res: Response, next: NextFunction): void 
     return;
   }
 
+  // Find user with matching code that hasn't expired
   db.oneOrNone(
     `SELECT * FROM app_user 
      WHERE email = $[email] 
@@ -305,7 +349,7 @@ function verifyEmailCode(req: Request, res: Response, next: NextFunction): void 
         return null;
       }
 
-      // FIX: Mark as verified, don't generate new code
+      // Mark user as verified and clear verification data
       return db.one(
         `UPDATE app_user 
          SET is_verified = true, 
@@ -328,6 +372,11 @@ function verifyEmailCode(req: Request, res: Response, next: NextFunction): void 
     .catch(next);
 }
 
+/**
+ * Resends verification code to user's email
+ * - Generates new code with fresh 15-min expiration
+ * - Only works for unverified accounts
+ */
 function resendVerification(req: Request, res: Response, next: NextFunction): void {
   const { email } = req.body;
 
@@ -348,6 +397,7 @@ function resendVerification(req: Request, res: Response, next: NextFunction): vo
         return null;
       }
 
+      // Generate new verification code
       const verificationCode = generateVerificationCode();
 
       return db.one(
@@ -374,14 +424,22 @@ function resendVerification(req: Request, res: Response, next: NextFunction): vo
 }
 
 // ----------------------------------------------
-// User Endpoints
+// User Handlers
 // ----------------------------------------------
+
+/**
+ * Get all users
+ */
 function readUsers(_req: Request, res: Response, next: NextFunction): void {
   db.manyOrNone("SELECT * FROM app_user")
     .then((data: User[]) => res.send(data))
     .catch(next);
 }
 
+/**
+ * Get user by ID with full image URLs
+ * Converts relative image paths to full URLs based on request host
+ */
 function readUser(req: Request, res: Response, next: NextFunction): void {
   db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
     .then((user: User | null) => {
@@ -399,9 +457,12 @@ function readUser(req: Request, res: Response, next: NextFunction): void {
 
       let profile_picture = user.profile_picture;
 
+      // Handle uploaded files (start with 'user_')
       if (profile_picture?.startsWith('user_')) {
         profile_picture = `http://${host}/uploads/${profile_picture}`;
-      } else if (profile_picture?.includes('localhost')) {
+      } 
+      // Handle localhost URLs in production
+      else if (profile_picture?.includes('localhost')) {
         profile_picture = profile_picture.replace(/localhost:\d+/, host);
       }
 
@@ -410,6 +471,9 @@ function readUser(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Create a new user
+ */
 function createUser(req: Request, res: Response, next: NextFunction): void {
   db.one(
     "INSERT INTO app_user(name, profile_picture) VALUES($[name], $[profile_picture]) RETURNING user_id",
@@ -419,11 +483,15 @@ function createUser(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Update user information
+ * Supports partial updates of name, profile_picture, and email
+ */
 function updateUser(req: Request, res: Response, next: NextFunction): void {
   const { id } = req.params;
   const updates = req.body as Partial<UserInput>;
 
-  // Build SET clause dynamically
+  // Build SET clause dynamically based on provided fields
   const fields: string[] = [];
   const values: any = { id };
 
@@ -452,6 +520,10 @@ function updateUser(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Handle profile picture upload
+ * Returns the uploaded filename
+ */
 function uploadProfilePicture(req: Request, res: Response): void {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
@@ -465,28 +537,30 @@ function uploadProfilePicture(req: Request, res: Response): void {
 }
 
 // ----------------------------------------------
-// Item Endpoints
+// Item Handlers
 // ----------------------------------------------
+
+/**
+ * Get all items with full image URLs
+ * Converts relative image paths to full URLs based on request host
+ */
 function readItems(req: Request, res: Response, next: NextFunction): void {
   db.manyOrNone("SELECT * FROM item")
     .then((items: Item[]) => {
-      // Get host from request, but handle both localhost and actual IP
+      // Determine host for building full URLs
       let host = req.get('host') || 'localhost:3001';
-
-      // If request came from actual IP (not localhost), use that
       const forwardedHost = req.get('x-forwarded-host');
       if (forwardedHost) {
         host = forwardedHost;
       }
 
+      // Convert all image URLs to full paths
       const itemsWithFullUrls = items.map(item => {
         let image_url = item.image_url;
 
-        // If it starts with user_, convert to full URL
         if (image_url?.startsWith('user_')) {
           image_url = `http://${host}/uploads/${image_url}`;
         }
-        // If it's already a full URL but uses localhost, replace with actual host
         else if (image_url?.includes('localhost')) {
           image_url = image_url.replace(/localhost:\d+/, host);
         }
@@ -499,6 +573,10 @@ function readItems(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Get item by ID with owner information
+ * Includes owner name, avatar, and rating
+ */
 function readItem(req: Request, res: Response, next: NextFunction): void {
   db.oneOrNone(
     `SELECT 
@@ -525,7 +603,7 @@ function readItem(req: Request, res: Response, next: NextFunction): void {
         return;
       }
 
-      // Get host from request
+      // Convert image URLs to full paths
       let host = req.get('host') || 'localhost:3001';
       const forwardedHost = req.get('x-forwarded-host');
       if (forwardedHost) {
@@ -554,6 +632,9 @@ function readItem(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Create a new item listing
+ */
 function createItem(req: Request, res: Response, next: NextFunction): void {
   db.one(
     "INSERT INTO item(name, description, image_url, category, owner_id, request_status, start_date, end_date) VALUES($[name], $[description], $[image_url], $[category], $[owner_id], $[request_status], $[start_date], $[end_date]) RETURNING item_id",
@@ -563,20 +644,27 @@ function createItem(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Handle item image upload
+ * Returns the uploaded filename (not full URL)
+ */
 function uploadItemImage(req: Request, res: Response): void {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
     return;
   }
 
-  // Return just the filename, not the full URL
-  // The readItems function will construct the full URL based on the request host
+  // Return just the filename - full URL will be constructed by readItems
   res.json({
     success: true,
     filename: req.file.filename
   });
 }
 
+/**
+ * Update item information
+ * Supports partial updates of any item field
+ */
 function updateItem(req: Request, res: Response, next: NextFunction): void {
   const { id } = req.params;
   const updates = req.body as Partial<ItemInput>;
@@ -626,18 +714,22 @@ function updateItem(req: Request, res: Response, next: NextFunction): void {
     .catch(next);
 }
 
+/**
+ * Delete an item and all related records
+ * Cascades through: borrowing history → borrowing requests → messages → item
+ */
 function deleteItem(req: Request, res: Response, next: NextFunction): void {
   const { id } = req.params;
 
-  // Delete related records first, then the item (in correct order due to foreign keys)
+  // Use transaction to ensure all deletes succeed or fail together
   db.tx(async t => {
-    // First, get all borrowing request IDs for this item
+    // Get all borrowing request IDs for this item
     const requests = await t.manyOrNone(
       "SELECT request_id FROM borrowingrequest WHERE item_id = $[id]",
       { id }
     );
 
-    // Delete borrowing history for these requests
+    // Delete borrowing history first (foreign key constraint)
     if (requests.length > 0) {
       const requestIds = requests.map(r => r.request_id);
       await t.none(
@@ -671,10 +763,14 @@ function deleteItem(req: Request, res: Response, next: NextFunction): void {
     });
 }
 
+// ----------------------------------------------
+// Borrowing Request Handlers
+// ----------------------------------------------
 
-// ----------------------------------------------
-// Borrowing Requests
-// ----------------------------------------------
+/**
+ * Get all active borrowing requests
+ * Returns requests for items with 'pending' status
+ */
 function readActiveBorrowRequests(_req: Request, res: Response, next: NextFunction): void {
   const query = `
         SELECT r.request_id, u.name AS requester, i.name AS item, r.request_datetime
@@ -689,6 +785,9 @@ function readActiveBorrowRequests(_req: Request, res: Response, next: NextFuncti
     .catch(next);
 }
 
+/**
+ * Create a new borrowing request
+ */
 function createBorrowRequest(req: Request, res: Response, next: NextFunction): void {
   db.one(
     "INSERT INTO borrowingrequest(user_id, item_id) VALUES($[user_id], $[item_id]) RETURNING request_id",
@@ -699,18 +798,25 @@ function createBorrowRequest(req: Request, res: Response, next: NextFunction): v
 }
 
 // ----------------------------------------------
-// Messages
+// Message Handlers
 // ----------------------------------------------
+
+/**
+ * Get all messages ordered by timestamp
+ */
 function readMessages(_req: Request, res: Response, next: NextFunction): void {
   db.manyOrNone("SELECT * FROM messages ORDER BY sent_at")
     .then((rows) => res.send(rows))
     .catch(next);
 }
 
+/**
+ * Get user's messages grouped by conversation
+ * Returns most recent message per conversation partner
+ */
 function readUserMessages(req: Request, res: Response, next: NextFunction): void {
   const { userId } = req.params;
 
-  // Get all messages where user is sender or receiver, grouped by conversation
   db.manyOrNone(
     `SELECT DISTINCT ON (other_user_id)
             m.message_id,
@@ -738,10 +844,14 @@ function readUserMessages(req: Request, res: Response, next: NextFunction): void
     .catch(next);
 }
 
+/**
+ * Create a new message
+ * item_id is optional - used when message is about a specific item
+ */
 function createMessage(req: Request, res: Response, next: NextFunction): void {
   const { sender_id, receiver_id, item_id, content } = req.body as MessageInput;
 
-  // Make item_id optional - only include if provided
+  // Use different query based on whether item_id is provided
   const query = item_id
     ? "INSERT INTO messages(sender_id, receiver_id, item_id, content) VALUES($[sender_id], $[receiver_id], $[item_id], $[content]) RETURNING message_id"
     : "INSERT INTO messages(sender_id, receiver_id, content) VALUES($[sender_id], $[receiver_id], $[content]) RETURNING message_id";
