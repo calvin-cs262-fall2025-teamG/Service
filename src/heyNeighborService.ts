@@ -15,9 +15,8 @@ import express from 'express';
 import pgPromise from 'pg-promise';
 import path from 'path';
 import multer from 'multer';
-import fs from 'fs';
+import * as fs from 'fs';
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
 
 import type { Request, Response, NextFunction } from 'express';
 import type { User, UserInput } from './types/user.js';
