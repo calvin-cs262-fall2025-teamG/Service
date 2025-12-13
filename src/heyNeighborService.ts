@@ -103,6 +103,8 @@ router.post("/auth/login", login);
 router.get("/users", readUsers);
 router.get("/users/:id", readUser);
 router.post("/users", createUser);
+router.put("/users/:id", updateUser);
+router.post("/users/:id/profile-picture", upload.single('photo'), uploadProfilePicture);
 
 // ===== Items =====
 router.get("/items", readItems);
@@ -205,7 +207,29 @@ function readUsers(_req: Request, res: Response, next: NextFunction): void {
 
 function readUser(req: Request, res: Response, next: NextFunction): void {
     db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
-        .then((data: User | null) => returnDataOr404(res, data))
+        .then((user: User | null) => {
+            if (!user) {
+                res.sendStatus(404);
+                return;
+            }
+            
+            // Convert profile picture filename to full URL
+            let host = req.get('host') || 'localhost:3001';
+            const forwardedHost = req.get('x-forwarded-host');
+            if (forwardedHost) {
+                host = forwardedHost;
+            }
+            
+            let profile_picture = user.profile_picture;
+            
+            if (profile_picture?.startsWith('user_')) {
+                profile_picture = `http://${host}/uploads/${profile_picture}`;
+            } else if (profile_picture?.includes('localhost')) {
+                profile_picture = profile_picture.replace(/localhost:\d+/, host);
+            }
+            
+            res.send({ ...user, profile_picture });
+        })
         .catch(next);
 }
 
@@ -216,6 +240,51 @@ function createUser(req: Request, res: Response, next: NextFunction): void {
     )
         .then((data: { user_id: number }) => res.send(data))
         .catch(next);
+}
+
+function updateUser(req: Request, res: Response, next: NextFunction): void {
+    const { id } = req.params;
+    const updates = req.body as Partial<UserInput>;
+    
+    // Build SET clause dynamically
+    const fields: string[] = [];
+    const values: any = { id };
+    
+    if (updates.name !== undefined) {
+        fields.push('name = $[name]');
+        values.name = updates.name;
+    }
+    if (updates.profile_picture !== undefined) {
+        fields.push('profile_picture = $[profile_picture]');
+        values.profile_picture = updates.profile_picture;
+    }
+    if (updates.email !== undefined) {
+        fields.push('email = $[email]');
+        values.email = updates.email;
+    }
+    
+    if (fields.length === 0) {
+        res.status(400).json({ error: 'No fields to update' });
+        return;
+    }
+    
+    const query = `UPDATE app_user SET ${fields.join(', ')} WHERE user_id = $[id] RETURNING *`;
+    
+    db.one(query, values)
+        .then((data: User) => res.send(data))
+        .catch(next);
+}
+
+function uploadProfilePicture(req: Request, res: Response): void {
+    if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+    }
+    
+    res.json({ 
+        success: true,
+        filename: req.file.filename
+    });
 }
 
 // ----------------------------------------------
