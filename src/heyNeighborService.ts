@@ -19,8 +19,11 @@ import type { User, UserInput } from './types/user.js';
 import type { Item, ItemInput } from './types/item.js';
 import type { BorrowingRequestInput } from './types/borrowingrequest.js';
 import type { MessageInput } from './types/messages.js';
-import type { ItemWithOwner } from './types/item.js';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
+type MulterRequest = Request & { file?: Express.Multer.File };
 type AuthSignupInput = { email: string; password: string; name: string };
 type AuthLoginInput = { email: string; password: string };
 
@@ -48,9 +51,33 @@ const port = parseInt(process.env.PORT as string) || 3000;
 
 router.use(express.json());
 
+// Create uploads directory
+const uploadDir = path.join(process.cwd(), "uploads/profile_pics");
+fs.mkdirSync(uploadDir, { recursive: true });
+
+// Serve uploaded files
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+// Configure multer
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const userId = req.params.id;
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `user_${userId}_${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
 // ----------------------------------------------
 // Routes
 // ----------------------------------------------
+
+router.post("/users/:id/profile-picture", upload.single("photo"), uploadProfilePicture);
 
 // Health check
 router.get("/", (_req, res) => {
@@ -65,6 +92,7 @@ router.post("/auth/login", login);
 router.get("/users", readUsers);
 router.get("/users/:id", readUser);
 router.post("/users", createUser);
+router.put("/users/:id", updateUser);
 
 // ===== Items =====
 router.get("/items", readItems);
@@ -158,16 +186,38 @@ function login(req: Request, res: Response, next: NextFunction): void {
 // ----------------------------------------------
 // User Endpoints
 // ----------------------------------------------
-function readUsers(_req: Request, res: Response, next: NextFunction): void {
-    db.manyOrNone("SELECT * FROM app_user")
-        .then((data: User[]) => res.send(data))
-        .catch(next);
+function readUsers(req: Request, res: Response, next: NextFunction): void {
+  db.manyOrNone("SELECT * FROM app_user")
+    .then((users: User[]) => {
+      const host = req.get("host") || "localhost:3001";
+      const usersWithUrls = users.map(user => ({
+        ...user,
+        avatar_url: user.profile_picture 
+          ? `http://${host}/uploads/profile_pics/${user.profile_picture}`
+          : null
+      }));
+      res.send(usersWithUrls);
+    })
+    .catch(next);
 }
 
 function readUser(req: Request, res: Response, next: NextFunction): void {
-    db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
-        .then((data: User | null) => returnDataOr404(res, data))
-        .catch(next);
+  db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
+    .then((user: User | null) => {
+      if (!user) {
+        res.sendStatus(404);
+        return;
+      }
+      
+      // Add avatar_url if profile_picture exists
+      const host = req.get("host") || "localhost:3001";
+      const avatar_url = user.profile_picture 
+        ? `http://${host}/uploads/profile_pics/${user.profile_picture}`
+        : null;
+      
+      res.send({ ...user, avatar_url });
+    })
+    .catch(next);
 }
 
 function createUser(req: Request, res: Response, next: NextFunction): void {
@@ -179,39 +229,70 @@ function createUser(req: Request, res: Response, next: NextFunction): void {
         .catch(next);
 }
 
+function uploadProfilePicture(req: MulterRequest, res: Response, next: NextFunction): void {
+  const userId = Number(req.params.id);
+  
+  if (!userId || !req.file) {
+    res.status(400).json({ error: "Invalid request" });
+    return;
+  }
+
+  const filename = req.file.filename;
+
+  db.one(
+    "UPDATE app_user SET profile_picture = $[filename] WHERE user_id = $[userId] RETURNING *",
+    { filename, userId }
+  )
+    .then((user: User) => {
+      // Return user with full avatar URL
+      const host = req.get("host") || "localhost:3001";
+      const avatar_url = `http://${host}/uploads/profile_pics/${filename}`;
+      res.send({ ...user, avatar_url });
+    })
+    .catch(next);
+}
+
+function updateUser(req: Request, res: Response, next: NextFunction): void {
+    const { id } = req.params;
+    const updates = req.body as Partial<UserInput>;
+    
+    const fields: string[] = [];
+    const values: any = { id };
+    
+    if (updates.name !== undefined) {
+        fields.push('name = $[name]');
+        values.name = updates.name;
+    }
+    if (updates.profile_picture !== undefined) {
+        fields.push('profile_picture = $[profile_picture]');
+        values.profile_picture = updates.profile_picture;
+    }
+    
+    if (fields.length === 0) {
+        res.status(400).json({ error: 'No fields to update' });
+        return;
+    }
+    
+    const query = `UPDATE app_user SET ${fields.join(', ')} WHERE user_id = $[id] RETURNING *`;
+    
+    db.one(query, values)
+        .then((data: User) => res.send(data))
+        .catch(next);
+}
+
 // ----------------------------------------------
 // Item Endpoints
 // ----------------------------------------------
 function readItems(_req: Request, res: Response, next: NextFunction): void {
-  db.manyOrNone(
-    `
-    SELECT
-      i.*,
-      u.name AS owner_name,
-      u.profile_picture AS owner_avatar
-    FROM item i
-    JOIN app_user u ON u.user_id = i.owner_id
-    `
-  )
-    .then((data: any[]) => res.send(data))
-    .catch(next);
+    db.manyOrNone("SELECT * FROM item")
+        .then((data: Item[]) => res.send(data))
+        .catch(next);
 }
 
 function readItem(req: Request, res: Response, next: NextFunction): void {
-  db.oneOrNone(
-    `
-    SELECT
-      i.*,
-      u.name AS owner_name,
-      u.profile_picture AS owner_avatar
-    FROM item i
-    JOIN app_user u ON u.user_id = i.owner_id
-    WHERE i.item_id = $[id]
-    `,
-    req.params
-  )
-    .then((data: ItemWithOwner | null) => returnDataOr404(res, data))
-    .catch(next);
+    db.oneOrNone("SELECT * FROM item WHERE item_id = $[id]", req.params)
+        .then((data: Item | null) => returnDataOr404(res, data))
+        .catch(next);
 }
 
 function createItem(req: Request, res: Response, next: NextFunction): void {
