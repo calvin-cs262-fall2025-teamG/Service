@@ -13,17 +13,16 @@ import "dotenv/config";
 
 import express from 'express';
 import pgPromise from 'pg-promise';
+import path from 'path';
+import multer from 'multer';
+import fs from 'fs';
 
 import type { Request, Response, NextFunction } from 'express';
 import type { User, UserInput } from './types/user.js';
 import type { Item, ItemInput } from './types/item.js';
 import type { BorrowingRequestInput } from './types/borrowingrequest.js';
 import type { MessageInput } from './types/messages.js';
-import multer from "multer";
-import path from "path";
-import fs from "fs";
 
-type MulterRequest = Request & { file?: Express.Multer.File };
 type AuthSignupInput = { email: string; password: string; name: string };
 type AuthLoginInput = { email: string; password: string };
 
@@ -49,35 +48,47 @@ const app = express();
 const router = express.Router();
 const port = parseInt(process.env.PORT as string) || 3000;
 
-router.use(express.json());
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
-// Create uploads directory
-const uploadDir = path.join(process.cwd(), "uploads/profile_pics");
-fs.mkdirSync(uploadDir, { recursive: true });
-
-// Serve uploaded files
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
-// Configure multer
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const userId = req.params.id;
-    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
-    cb(null, `user_${userId}_${Date.now()}${ext}`);
-  },
+    destination: (req, file, cb) => {
+        cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `user_${req.body.userId || 'unknown'}_${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
 });
 
 const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (extname && mimetype) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'));
+        }
+    }
 });
+
+// Serve uploaded files
+app.use('/uploads', express.static(uploadsDir));
+
+router.use(express.json());
 
 // ----------------------------------------------
 // Routes
 // ----------------------------------------------
-
-router.post("/users/:id/profile-picture", upload.single("photo"), uploadProfilePicture);
 
 // Health check
 router.get("/", (_req, res) => {
@@ -92,12 +103,12 @@ router.post("/auth/login", login);
 router.get("/users", readUsers);
 router.get("/users/:id", readUser);
 router.post("/users", createUser);
-router.put("/users/:id", updateUser);
 
 // ===== Items =====
 router.get("/items", readItems);
 router.get("/items/:id", readItem);
 router.post("/items", createItem);
+router.post("/items/upload", upload.single('photo'), uploadItemImage);
 router.put("/items/:id", updateItem);
 router.delete("/items/:id", deleteItem);
 
@@ -186,38 +197,16 @@ function login(req: Request, res: Response, next: NextFunction): void {
 // ----------------------------------------------
 // User Endpoints
 // ----------------------------------------------
-function readUsers(req: Request, res: Response, next: NextFunction): void {
-  db.manyOrNone("SELECT * FROM app_user")
-    .then((users: User[]) => {
-      const host = req.get("host") || "localhost:3001";
-      const usersWithUrls = users.map(user => ({
-        ...user,
-        avatar_url: user.profile_picture 
-          ? `http://${host}/uploads/profile_pics/${user.profile_picture}`
-          : null
-      }));
-      res.send(usersWithUrls);
-    })
-    .catch(next);
+function readUsers(_req: Request, res: Response, next: NextFunction): void {
+    db.manyOrNone("SELECT * FROM app_user")
+        .then((data: User[]) => res.send(data))
+        .catch(next);
 }
 
 function readUser(req: Request, res: Response, next: NextFunction): void {
-  db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
-    .then((user: User | null) => {
-      if (!user) {
-        res.sendStatus(404);
-        return;
-      }
-      
-      // Add avatar_url if profile_picture exists
-      const host = req.get("host") || "localhost:3001";
-      const avatar_url = user.profile_picture 
-        ? `http://${host}/uploads/profile_pics/${user.profile_picture}`
-        : null;
-      
-      res.send({ ...user, avatar_url });
-    })
-    .catch(next);
+    db.oneOrNone("SELECT * FROM app_user WHERE user_id = $[id]", req.params)
+        .then((data: User | null) => returnDataOr404(res, data))
+        .catch(next);
 }
 
 function createUser(req: Request, res: Response, next: NextFunction): void {
@@ -229,63 +218,38 @@ function createUser(req: Request, res: Response, next: NextFunction): void {
         .catch(next);
 }
 
-function uploadProfilePicture(req: MulterRequest, res: Response, next: NextFunction): void {
-  const userId = Number(req.params.id);
-  
-  if (!userId || !req.file) {
-    res.status(400).json({ error: "Invalid request" });
-    return;
-  }
-
-  const filename = req.file.filename;
-
-  db.one(
-    "UPDATE app_user SET profile_picture = $[filename] WHERE user_id = $[userId] RETURNING *",
-    { filename, userId }
-  )
-    .then((user: User) => {
-      // Return user with full avatar URL
-      const host = req.get("host") || "localhost:3001";
-      const avatar_url = `http://${host}/uploads/profile_pics/${filename}`;
-      res.send({ ...user, avatar_url });
-    })
-    .catch(next);
-}
-
-function updateUser(req: Request, res: Response, next: NextFunction): void {
-    const { id } = req.params;
-    const updates = req.body as Partial<UserInput>;
-    
-    const fields: string[] = [];
-    const values: any = { id };
-    
-    if (updates.name !== undefined) {
-        fields.push('name = $[name]');
-        values.name = updates.name;
-    }
-    if (updates.profile_picture !== undefined) {
-        fields.push('profile_picture = $[profile_picture]');
-        values.profile_picture = updates.profile_picture;
-    }
-    
-    if (fields.length === 0) {
-        res.status(400).json({ error: 'No fields to update' });
-        return;
-    }
-    
-    const query = `UPDATE app_user SET ${fields.join(', ')} WHERE user_id = $[id] RETURNING *`;
-    
-    db.one(query, values)
-        .then((data: User) => res.send(data))
-        .catch(next);
-}
-
 // ----------------------------------------------
 // Item Endpoints
 // ----------------------------------------------
-function readItems(_req: Request, res: Response, next: NextFunction): void {
+function readItems(req: Request, res: Response, next: NextFunction): void {
     db.manyOrNone("SELECT * FROM item")
-        .then((data: Item[]) => res.send(data))
+        .then((items: Item[]) => {
+            // Get host from request, but handle both localhost and actual IP
+            let host = req.get('host') || 'localhost:3001';
+            
+            // If request came from actual IP (not localhost), use that
+            const forwardedHost = req.get('x-forwarded-host');
+            if (forwardedHost) {
+                host = forwardedHost;
+            }
+            
+            const itemsWithFullUrls = items.map(item => {
+                let image_url = item.image_url;
+                
+                // If it starts with user_, convert to full URL
+                if (image_url?.startsWith('user_')) {
+                    image_url = `http://${host}/uploads/${image_url}`;
+                }
+                // If it's already a full URL but uses localhost, replace with actual host
+                else if (image_url?.includes('localhost')) {
+                    image_url = image_url.replace(/localhost:\d+/, host);
+                }
+                
+                return { ...item, image_url };
+            });
+            
+            res.send(itemsWithFullUrls);
+        })
         .catch(next);
 }
 
@@ -302,6 +266,20 @@ function createItem(req: Request, res: Response, next: NextFunction): void {
     )
         .then((data: { item_id: number }) => res.send(data))
         .catch(next);
+}
+
+function uploadItemImage(req: Request, res: Response): void {
+    if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+    }
+    
+    // Return just the filename, not the full URL
+    // The readItems function will construct the full URL based on the request host
+    res.json({ 
+        success: true,
+        filename: req.file.filename
+    });
 }
 
 function updateItem(req: Request, res: Response, next: NextFunction): void {
