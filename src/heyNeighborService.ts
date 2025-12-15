@@ -23,7 +23,6 @@ import nodemailer from 'nodemailer';
 import type { Request, Response, NextFunction } from 'express';
 import type { User, UserInput } from './types/user.js';
 import type { Item, ItemInput } from './types/item.js';
-import type { BorrowingRequestInput } from './types/borrowingrequest.js';
 import type { MessageInput } from './types/messages.js';
 
 type AuthSignupInput = { email: string; password: string; name: string };

@@ -1,5 +1,6 @@
 export interface User {
   user_id: number;
+  email: string;
   name: string;
   email?: string;
   profile_picture?: string;
@@ -9,6 +10,7 @@ export interface User {
 }
 
 export interface UserInput {
+  email: string;
   name: string;
   email?: string;
   profile_picture?: string;
