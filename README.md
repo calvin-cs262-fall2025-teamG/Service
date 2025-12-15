@@ -29,7 +29,11 @@ Service/
 ### 1. Install dependencies
 ```bash
 npm install
+
+npm install bcyrpt
+npm install --save-dev @types/bcrypt
 ```
+
 
 ### 2. Environment variables
 Create a .env file (ignored by Git) with your Azure Postgres credentials:
