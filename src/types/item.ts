@@ -8,8 +8,8 @@ export interface Item {
   status: "available" | "borrowed"; 
   created_at: string;
   // Owner info from JOIN queries
-  owner_name?: string;
-  owner_email?: string;
+  owner_name?: string | null;
+  owner_email?: string | null;
   owner_avatar?: string | null;
 }
 

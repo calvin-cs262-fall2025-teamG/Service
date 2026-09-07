@@ -19,11 +19,14 @@ import path from 'path';
 import multer from 'multer';
 import * as fs from 'fs';
 import nodemailer from 'nodemailer';
+import cors from 'cors';
+import bcrypt from "bcrypt";
 
 import type { Request, Response, NextFunction } from 'express';
 import type { User, UserInput } from './types/user.js';
 import type { Item, ItemInput } from './types/item.js';
 import type { MessageInput } from './types/messages.js';
+import type { BorrowingRequestInput } from './types/borrowingrequest.js';
 
 type AuthSignupInput = { email: string; password: string; name: string };
 type AuthLoginInput = { email: string; password: string };
@@ -188,6 +191,7 @@ router.get("/test-email", async (req, res) => {
   }
 });
 
+app.use(cors());
 app.use(router);
 
 // Global error handler
@@ -228,37 +232,41 @@ function returnDataOr404(res: Response, data: unknown): void {
  * - Validates @calvin.edu email domain
  * - Generates 6-digit code with 15-min expiration
  * - Sends verification email
- * - Creates unverified user account
  */
 function signup(req: Request, res: Response, next: NextFunction): void {
-  const { email, name } = req.body as AuthSignupInput;
+  const { email, name, password } = req.body as AuthSignupInput;
 
-  if (!email || !name) {
-    res.status(400).json({ error: "email and name are required" });
+  if (!email || !name || !password) {
+    res.status(400).json({ error: "email, name, and password are required" });
     return;
   }
 
-  // Only allow Calvin College email addresses
   if (!email.endsWith('@calvin.edu')) {
-    res.status(400).json({ error: "Must use a Calvin College email address (@calvin.edu)" });
+    res.status(400).json({ error: "Must use a Calvin University email address (@calvin.edu)" });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
     return;
   }
 
   const verificationCode = generateVerificationCode();
 
   db.oneOrNone("SELECT * FROM app_user WHERE email = $[email]", { email })
-    .then((existing: User | null) => {
+    .then(async (existing: User | null) => {
       if (existing) {
         res.status(409).json({ error: "Email already in use" });
         return null;
       }
 
-      // Create user with verification code (expires in 15 minutes)
+      const passwordHash = await bcrypt.hash(password, 10);
+
       return db.one(
-        `INSERT INTO app_user (email, name, verification_token, is_verified, token_expires_at) 
-         VALUES ($[email], $[name], $[verificationCode], false, NOW() + INTERVAL '15 minutes') 
+        `INSERT INTO app_user (email, name, password_hash, verification_token, is_verified, token_expires_at) 
+         VALUES ($[email], $[name], $[passwordHash], $[verificationCode], false, NOW() + INTERVAL '15 minutes') 
          RETURNING *`,
-        { email, name, verificationCode }
+        { email, name, passwordHash, verificationCode }
       );
     })
     .then(async (created: User | null) => {
@@ -286,21 +294,20 @@ function signup(req: Request, res: Response, next: NextFunction): void {
  * - Returns user data on success
  */
 function login(req: Request, res: Response, next: NextFunction): void {
-  const { email } = req.body as AuthLoginInput;
+  const { email, password } = req.body as AuthLoginInput;
 
-  if (!email) {
-    res.status(400).json({ error: "email is required" });
+  if (!email || !password) {
+    res.status(400).json({ error: "email and password are required" });
     return;
   }
 
   db.oneOrNone("SELECT * FROM app_user WHERE email = $[email]", { email })
-    .then((user: User | null) => {
-      if (!user) {
+    .then(async (user: User | null) => {
+      if (!user || !user.password_hash) {
         res.status(401).json({ error: "Invalid email or password" });
         return;
       }
 
-      // Check if email is verified
       if (!user.is_verified) {
         res.status(403).json({
           error: "Email not verified. Please check your inbox for the verification code.",
@@ -310,7 +317,14 @@ function login(req: Request, res: Response, next: NextFunction): void {
         return;
       }
 
-      res.json({ message: "Login successful", user });
+      const passwordMatches = await bcrypt.compare(password, user.password_hash);
+      if (!passwordMatches) {
+        res.status(401).json({ error: "Invalid email or password" });
+        return;
+      }
+
+      const { password_hash, ...safeUser } = user;
+      res.json({ message: "Login successful", user: safeUser });
     })
     .catch(next);
 }

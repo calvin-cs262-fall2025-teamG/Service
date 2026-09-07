@@ -2,7 +2,7 @@ export interface User {
   user_id: number;
   email: string;
   name: string;
-  email?: string;
+  password_hash?: string;
   profile_picture?: string;
   verification_token?: string;
   is_verified?: boolean;
@@ -12,6 +12,5 @@ export interface User {
 export interface UserInput {
   email: string;
   name: string;
-  email?: string;
   profile_picture?: string;
 }

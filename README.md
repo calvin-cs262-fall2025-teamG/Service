@@ -44,7 +44,7 @@ DB_PASSWORD=your-password
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASSWORD=your-app-password
 
-PORT=3000
+PORT=3001
 NODE_ENV=production
 
 > Use a Gmail App Password (not your regular password) for `EMAIL_PASSWORD`. 
@@ -53,7 +53,7 @@ NODE_ENV=production
 
 Run the schema:
 
-psql -h $DB_SERVER -U $DB_USER -d $DB_DATABASE -f sql/heyneighbor_schema.sql
+PGSSLMODE=require psql -h $DB_SERVER -U $DB_USER -d $DB_DATABASE -f sql/heyneighbor_schema.sql
 
 You can use `heyneighbor_queries.sql` for quick manual SELECT queries while debugging. 
 
@@ -61,7 +61,7 @@ You can use `heyneighbor_queries.sql` for quick manual SELECT queries while debu
 
 npm start
 
-By default, the service runs on `http://0.0.0.0:3000` (or whatever you set in `PORT`).
+By default, the service runs on `http://0.0.0.0:3001` (or whatever you set in `PORT`).
 
 ---
 
