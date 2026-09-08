@@ -179,12 +179,11 @@ router.get("/messages", readMessages);
 router.get("/messages/user/:userId", readUserMessages);
 router.post("/messages", createMessage);
 
-// ===== Development/Testing Routes =====
-// TODO: Remove before production deployment
 router.get("/test-email", async (req, res) => {
   try {
-    await sendVerificationEmail("test@calvin.edu", "123456", "Test User");
-    res.json({ success: true, message: "Email sent! Check your inbox." });
+    const targetEmail = (req.query.email as string) || "test@calvin.edu";
+    await sendVerificationEmail(targetEmail, "123456", "Test User");
+    res.json({ success: true, message: `Email sent to ${targetEmail}! Check your inbox.` });
   } catch (error: any) {
     console.error("Email error:", error);
     res.status(500).json({ error: error.message });
@@ -221,6 +220,15 @@ function returnDataOr404(res: Response, data: unknown): void {
   } else {
     res.send(data);
   }
+}
+
+/**
+ * Strips secrets (password hash, verification token/expiry) before a user
+ * row is sent to a client
+ */
+function sanitizeUser(user: User): Omit<User, "password_hash" | "verification_token" | "token_expires_at"> {
+  const { password_hash, verification_token, token_expires_at, ...safeUser } = user;
+  return safeUser;
 }
 
 // ----------------------------------------------
@@ -323,8 +331,7 @@ function login(req: Request, res: Response, next: NextFunction): void {
         return;
       }
 
-      const { password_hash, ...safeUser } = user;
-      res.json({ message: "Login successful", user: safeUser });
+      res.json({ message: "Login successful", user: sanitizeUser(user) });
     })
     .catch(next);
 }
@@ -358,7 +365,7 @@ function verifyEmailCode(req: Request, res: Response, next: NextFunction): void 
       }
 
       if (user.is_verified) {
-        res.json({ message: "Email already verified", alreadyVerified: true, user });
+        res.json({ message: "Email already verified", alreadyVerified: true, user: sanitizeUser(user) });
         return null;
       }
 
@@ -379,7 +386,7 @@ function verifyEmailCode(req: Request, res: Response, next: NextFunction): void 
       res.json({
         message: "Email verified successfully!",
         verified: true,
-        user: updated
+        user: sanitizeUser(updated)
       });
     })
     .catch(next);
@@ -445,7 +452,7 @@ function resendVerification(req: Request, res: Response, next: NextFunction): vo
  */
 function readUsers(_req: Request, res: Response, next: NextFunction): void {
   db.manyOrNone("SELECT * FROM app_user")
-    .then((data: User[]) => res.send(data))
+    .then((data: User[]) => res.send(data.map(sanitizeUser)))
     .catch(next);
 }
 
@@ -479,7 +486,7 @@ function readUser(req: Request, res: Response, next: NextFunction): void {
         profile_picture = profile_picture.replace(/localhost:\d+/, host);
       }
 
-      res.send({ ...user, profile_picture });
+      res.send({ ...sanitizeUser(user), profile_picture });
     })
     .catch(next);
 }
@@ -529,7 +536,7 @@ function updateUser(req: Request, res: Response, next: NextFunction): void {
   const query = `UPDATE app_user SET ${fields.join(', ')} WHERE user_id = $[id] RETURNING *`;
 
   db.one(query, values)
-    .then((data: User) => res.send(data))
+    .then((data: User) => res.send(sanitizeUser(data)))
     .catch(next);
 }
 
