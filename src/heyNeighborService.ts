@@ -180,6 +180,10 @@ router.get("/messages/user/:userId", readUserMessages);
 router.post("/messages", createMessage);
 
 router.get("/test-email", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).end();
+    return;
+  }
   try {
     const targetEmail = (req.query.email as string) || "test@calvin.edu";
     await sendVerificationEmail(targetEmail, "123456", "Test User");
