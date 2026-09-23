@@ -7,11 +7,11 @@ DROP TABLE IF EXISTS borrowinghistory CASCADE;
 DROP TABLE IF EXISTS borrowingrequest CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS item CASCADE;
-DROP TABLE IF EXISTS app_user CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
 
 -- Users
-CREATE TABLE app_user (
-    user_id SERIAL PRIMARY KEY,
+CREATE TABLE profiles (
+    profile_id UUID PRIMARY KEY REFERENCES auth.users(id),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
     user_name VARCHAR(100) NOT NULL,
