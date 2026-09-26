@@ -1,19 +1,21 @@
 -- heyneighbor_schema.sql
 -- Drop all tables (clean slate)
+DROP TABLE IF EXISTS organization_member CASCADE;
+DROP TABLE IF EXISTS organization_admin CASCADE;
+DROP TABLE IF EXISTS organization CASCADE;
 DROP TABLE IF EXISTS borrowinghistory CASCADE;
 DROP TABLE IF EXISTS borrowingrequest CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS item CASCADE;
-DROP TABLE IF EXISTS app_user CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
 
 -- Users
-CREATE TABLE app_user (
-    user_id SERIAL PRIMARY KEY,
+CREATE TABLE profiles (
+    profile_id UUID PRIMARY KEY REFERENCES auth.users(id),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
-    name VARCHAR(100) NOT NULL,
+    user_name VARCHAR(100) NOT NULL,
     profile_picture VARCHAR(500),
-    rating NUMERIC(2,1),
     verification_token VARCHAR(10),
     is_verified BOOLEAN DEFAULT false,
     token_expires_at TIMESTAMP,
@@ -23,14 +25,13 @@ CREATE TABLE app_user (
 -- Items
 CREATE TABLE item (
     item_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
+    item_name VARCHAR(100) NOT NULL,
+    item_description TEXT,
     image_url VARCHAR(500),
-    category VARCHAR(50),
+    -- category VARCHAR(50), -- What are we doing with these?
     owner_id INT NOT NULL,
-    request_status VARCHAR(20) DEFAULT 'available', -- 'available', 'borrowed', 'pending'
-    start_date DATE,
-    end_date DATE,
+    request_status VARCHAR(20) DEFAULT 'available' NOT NULL, -- 'available', 'borrowed', 'pending'
+    return_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES app_user(user_id) ON DELETE CASCADE
 );
@@ -59,12 +60,34 @@ CREATE TABLE messages (
     sender_id INT NOT NULL,
     receiver_id INT NOT NULL,
     item_id INT, -- optional: message about a specific item
-    content TEXT NOT NULL,
+    message_content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES app_user(user_id) ON DELETE CASCADE,
     FOREIGN KEY (receiver_id) REFERENCES app_user(user_id) ON DELETE CASCADE,
     FOREIGN KEY (item_id) REFERENCES item(item_id) ON DELETE SET NULL
 );
+
+-- Organizations
+CREATE TABLE organization (
+    organization_id SERIAL PRIMARY KEY,
+    organization_name VARCHAR(100) NOT NULL,
+    owner_id INT NOT NULL,
+    FOREIGN KEY (owner_id) REFERENCES app_user(user_id) ON DELETE CASCADE
+)
+
+CREATE TABLE organization_admin (
+    organization_id INT NOT NULL,
+    user_id INT NOT NULL,
+    FOREIGN KEY (organization_id) REFERENCES organization(organization_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+)
+
+CREATE TABLE organization_member (
+    organization_id INT NOT NULL,
+    user_id INT NOT NULL,
+    FOREIGN KEY (organization_id) REFERENCES organization(organization_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE    
+)
 
 -- Sample Users
 INSERT INTO app_user (email, name, is_verified, rating) VALUES

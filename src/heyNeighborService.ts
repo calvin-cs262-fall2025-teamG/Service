@@ -23,10 +23,18 @@ import cors from 'cors';
 import bcrypt from "bcrypt";
 
 import type { Request, Response, NextFunction } from 'express';
-import type { User, UserInput } from './types/user.js';
-import type { Item, ItemInput } from './types/item.js';
-import type { MessageInput } from './types/messages.js';
-import type { BorrowingRequestInput } from './types/borrowingrequest.js';
+import type {
+  User,
+  UserInput,
+  BorrowingRequest,
+  BorrowingRequestInput,
+  Item,
+  ItemInput,
+  ItemWithOwner,
+  Message,
+  MessageInput,
+}
+from './serviceTypes.js';
 
 type AuthSignupInput = { email: string; password: string; name: string };
 type AuthLoginInput = { email: string; password: string };
