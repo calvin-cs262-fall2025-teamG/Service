@@ -10,7 +10,15 @@ insert into auth.users (
   raw_app_meta_data,
   raw_user_meta_data,
   created_at,
-  updated_at
+  updated_at,
+  confirmation_token,
+  recovery_token,
+  email_change,
+  email_change_token_new,
+  email_change_token_current,
+  phone_change,
+  phone_change_token,
+  reauthentication_token
 )
 values
   (
@@ -24,7 +32,8 @@ values
     '{"provider":"email","providers":["email"]}',
     '{"display_name":"Alex Rivera"}',
     now(),
-    now()
+    now(),
+    '', '', '', '', '', '', '', ''
   ),
   (
     '00000000-0000-0000-0000-000000000000',
@@ -37,7 +46,8 @@ values
     '{"provider":"email","providers":["email"]}',
     '{"display_name":"Jamie Chen"}',
     now(),
-    now()
+    now(),
+    '', '', '', '', '', '', '', ''
   ),
   (
     '00000000-0000-0000-0000-000000000000',
@@ -50,7 +60,8 @@ values
     '{"provider":"email","providers":["email"]}',
     '{"display_name":"Morgan Patel"}',
     now(),
-    now()
+    now(),
+    '', '', '', '', '', '', '', ''
   )
 on conflict (id) do nothing;
 
