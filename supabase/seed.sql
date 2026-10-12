@@ -204,7 +204,7 @@ set
   borrowed_at = excluded.borrowed_at,
   returned_at = excluded.returned_at;
 
-insert into public.messages (id, sender_id, receiver_id, item_id, content, created_at)
+insert into public.direct_messages (id, sender_id, receiver_id, item_id, content, created_at)
 values
   (
     '50000000-0000-0000-0000-000000000001',
@@ -234,6 +234,47 @@ on conflict (id) do update
 set
   sender_id = excluded.sender_id,
   receiver_id = excluded.receiver_id,
+  item_id = excluded.item_id,
+  content = excluded.content,
+  created_at = excluded.created_at;
+
+insert into public.community_messages (
+  id,
+  sender_id,
+  community_id,
+  item_id,
+  content,
+  created_at
+)
+values
+  (
+    '60000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000001',
+    'Does anyone have extra drill bits to lend?',
+    now() - interval '2 hours'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    null,
+    'I can bring my spare set by this afternoon.',
+    now() - interval '1 hour'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000001',
+    null,
+    'Thanks, that would be great!',
+    now()
+  )
+on conflict (id) do update
+set
+  sender_id = excluded.sender_id,
+  community_id = excluded.community_id,
   item_id = excluded.item_id,
   content = excluded.content,
   created_at = excluded.created_at;
