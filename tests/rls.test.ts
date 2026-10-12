@@ -30,6 +30,11 @@ const MSG_IDS = [
   "50000000-0000-0000-0000-000000000002",
   "50000000-0000-0000-0000-000000000003",
 ];
+const COMMUNITY_MSG_IDS = [
+  "60000000-0000-0000-0000-000000000001",
+  "60000000-0000-0000-0000-000000000002",
+  "60000000-0000-0000-0000-000000000003",
+];
 
 const OUTSIDER_EMAIL = "rls-outsider@example.com";
 
@@ -160,7 +165,8 @@ describe("RLS policies (local Supabase)", () => {
       "items",
       "borrowing_requests",
       "borrowing_history",
-      "messages",
+      "direct_messages",
+      "community_messages",
       "communities",
       "community_members",
     ]) {
@@ -447,41 +453,109 @@ describe("RLS policies (local Supabase)", () => {
     });
   });
 
-  describe("messages", () => {
+  describe("direct_messages", () => {
     it("only sender and receiver can view a message", async () => {
-      assert.deepEqual(await ids(alex.from("messages").select("id")), [...MSG_IDS].sort());
+      assert.deepEqual(await ids(alex.from("direct_messages").select("id")), [...MSG_IDS].sort());
       assert.deepEqual(
-        await ids(jamie.from("messages").select("id")),
+        await ids(jamie.from("direct_messages").select("id")),
         [MSG_IDS[0], MSG_IDS[1]].sort(),
       );
-      assert.deepEqual(await ids(morgan.from("messages").select("id")), [MSG_IDS[2]]);
-      assert.deepEqual(await ids(outsider.from("messages").select("id")), []);
+      assert.deepEqual(await ids(morgan.from("direct_messages").select("id")), [MSG_IDS[2]]);
+      assert.deepEqual(await ids(outsider.from("direct_messages").select("id")), []);
     });
 
     it("users can send messages only as themselves", async () => {
       assertRlsError(
         await jamie
-          .from("messages")
+          .from("direct_messages")
           .insert({ sender_id: ALEX, receiver_id: JAMIE, content: "spoof" }),
       );
 
       const ok = await jamie
-        .from("messages")
+        .from("direct_messages")
         .insert({ sender_id: JAMIE, receiver_id: MORGAN, content: "rls hello" })
         .select()
         .single();
       assert.ifError(ok.error);
-      await admin.from("messages").delete().eq("id", ok.data!.id);
+      await admin.from("direct_messages").delete().eq("id", ok.data!.id);
     });
 
     it("messages cannot be edited or deleted by clients", async () => {
       assertRlsError(
         await jamie
-          .from("messages")
+          .from("direct_messages")
           .update({ content: "edited" })
           .eq("id", MSG_IDS[0]),
       );
-      assertRlsError(await jamie.from("messages").delete().eq("id", MSG_IDS[0]));
+      assertRlsError(await jamie.from("direct_messages").delete().eq("id", MSG_IDS[0]));
+    });
+  });
+
+  describe("community_messages", () => {
+    it("active community members can view every message in their community", async () => {
+      for (const client of [alex, jamie, morgan]) {
+        assert.deepEqual(
+          await ids(client.from("community_messages").select("id")),
+          [...COMMUNITY_MSG_IDS].sort(),
+        );
+      }
+    });
+
+    it("non-members and pending members cannot view community messages", async () => {
+      assert.deepEqual(await ids(outsider.from("community_messages").select("id")), []);
+
+      const { error } = await outsider
+        .from("community_members")
+        .insert({ community_id: COMMUNITY, user_id: outsiderId });
+      assert.ifError(error);
+      try {
+        assert.deepEqual(await ids(outsider.from("community_messages").select("id")), []);
+      } finally {
+        await admin
+          .from("community_members")
+          .delete()
+          .eq("community_id", COMMUNITY)
+          .eq("user_id", outsiderId);
+      }
+    });
+
+    it("active members of another community cannot view these messages", async () => {
+      const created = await admin
+        .from("communities")
+        .insert({ name: "RLS unrelated community", owner_id: ALEX })
+        .select("id")
+        .single();
+      assert.ifError(created.error);
+      const otherCommunityId = created.data.id as string;
+
+      try {
+        const membership = await admin.from("community_members").insert({
+          community_id: otherCommunityId,
+          user_id: outsiderId,
+          role: "member",
+          status: "active",
+        });
+        assert.ifError(membership.error);
+        assert.deepEqual(await ids(outsider.from("community_messages").select("id")), []);
+      } finally {
+        await admin.from("communities").delete().eq("id", otherCommunityId);
+      }
+    });
+
+    it("users can send community messages only as themselves", async () => {
+      assertRlsError(
+        await jamie
+          .from("community_messages")
+          .insert({ sender_id: ALEX, community_id: COMMUNITY, content: "spoof" }),
+      );
+
+      const sent = await jamie
+        .from("community_messages")
+        .insert({ sender_id: JAMIE, community_id: COMMUNITY, content: "rls hello" })
+        .select("id")
+        .single();
+      assert.ifError(sent.error);
+      await admin.from("community_messages").delete().eq("id", sent.data.id);
     });
   });
 
