@@ -12,7 +12,9 @@
     "scripts": {
         "start": "node --experimental-strip-types src/heyNeighborService.ts",
         "type-check": "tsc --noEmit",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "test:rls": "node --experimental-strip-types --test tests/rls.test.ts",
+        "test:auth": "node --experimental-strip-types --test tests/auth.test.ts"
     },
     "dependencies": {
         "@supabase/server": "^1.8.0",
@@ -25,6 +27,9 @@
         "pg-promise": "11.x"
     },
     "devDependencies": {
+        "@snaplet/copycat": "^6.0.0",
+        "@snaplet/seed": "^0.98.0",
+        "@supabase/supabase-js": "^2.117.0",
         "@types/bcrypt": "^6.0.0",
         "@types/cors": "^2.8.19",
         "@types/express": "^4.17.21",
@@ -34,6 +39,7 @@
         "@typescript-eslint/eslint-plugin": "^8.36.0",
         "@typescript-eslint/parser": "^8.36.0",
         "eslint": "9.x",
+        "postgres": "^3.4.9",
         "typescript": "^5.9.3"
     }
 }
