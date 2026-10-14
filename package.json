@@ -13,6 +13,7 @@
         "start": "node --experimental-strip-types src/heyNeighborService.ts",
         "type-check": "tsc --noEmit",
         "lint": "eslint .",
+        "test:database-functions": "node --experimental-strip-types --test tests/database-functions.test.ts",
         "test:rls": "node --experimental-strip-types --test tests/rls.test.ts",
         "test:auth": "node --experimental-strip-types --test tests/auth.test.ts"
     },
