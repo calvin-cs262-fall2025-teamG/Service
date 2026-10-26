@@ -116,12 +116,21 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Buckets stay private; access is controlled by the storage RLS policies.
+[storage.buckets.profile-pictures]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
+
+[storage.buckets.item-images]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
+
+[storage.buckets.community-images]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
@@ -383,6 +392,14 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Called by pg_cron with the service role key as a Bearer token. The function
+# verifies that header itself, so the gateway JWT check is disabled to also
+# allow non-JWT secret keys.
+[functions.cleanup-storage]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/cleanup-storage/index.ts"
 
 [analytics]
 enabled = true

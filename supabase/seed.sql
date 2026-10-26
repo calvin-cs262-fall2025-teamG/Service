@@ -1,3 +1,16 @@
+-- Private image buckets (mirrors config.toml). Seed rows below intentionally
+-- leave avatar_path/image_path null: image paths must reference uploaded files.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  ('profile-pictures', 'profile-pictures', false, 5242880, array['image/png', 'image/jpeg', 'image/webp']),
+  ('item-images', 'item-images', false, 5242880, array['image/png', 'image/jpeg', 'image/webp']),
+  ('community-images', 'community-images', false, 5242880, array['image/png', 'image/jpeg', 'image/webp'])
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 -- Local demo users. The auth trigger creates matching profile rows.
 insert into auth.users (
   instance_id,
