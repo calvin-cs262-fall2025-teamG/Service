@@ -59,8 +59,8 @@ using (
   and exists (
     select 1
     from public.items as item
-    where item.owner_id::text = (storage.foldername(name))[1]
-      and item.id::text = (storage.foldername(name))[2]
+    where item.owner_id::text = (storage.foldername(objects.name))[1]
+      and item.id::text = (storage.foldername(objects.name))[2]
       and (
         item.owner_id = (select auth.uid())
         or (
@@ -119,7 +119,7 @@ using (
   and exists (
     select 1
     from public.communities as community
-    where community.id::text = (storage.foldername(name))[1]
+    where community.id::text = (storage.foldername(objects.name))[1]
   )
 );
 
@@ -139,12 +139,12 @@ with check (
     not exists (
       select 1
       from public.communities as community
-      where community.id::text = (storage.foldername(name))[1]
+      where community.id::text = (storage.foldername(objects.name))[1]
     )
     or exists (
       select 1
       from public.communities as community
-      where community.id::text = (storage.foldername(name))[1]
+      where community.id::text = (storage.foldername(objects.name))[1]
         and (
           community.owner_id = (select auth.uid())
           or public.is_community_admin(community.id)
@@ -163,7 +163,7 @@ using (
   and exists (
     select 1
     from public.communities as community
-    where community.id::text = (storage.foldername(name))[1]
+    where community.id::text = (storage.foldername(objects.name))[1]
       and (
         community.owner_id = (select auth.uid())
         or public.is_community_admin(community.id)
@@ -175,7 +175,7 @@ with check (
   and exists (
     select 1
     from public.communities as community
-    where community.id::text = (storage.foldername(name))[1]
+    where community.id::text = (storage.foldername(objects.name))[1]
       and (
         community.owner_id = (select auth.uid())
         or public.is_community_admin(community.id)
@@ -193,7 +193,7 @@ using (
   and exists (
     select 1
     from public.communities as community
-    where community.id::text = (storage.foldername(name))[1]
+    where community.id::text = (storage.foldername(objects.name))[1]
       and (
         community.owner_id = (select auth.uid())
         or public.is_community_admin(community.id)
