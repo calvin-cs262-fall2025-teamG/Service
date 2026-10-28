@@ -188,18 +188,47 @@ describe("storage policies and image consistency (local Supabase)", () => {
   });
 
   describe("community-images policies", () => {
-    it("owner can upload to an existing community folder; members cannot", async () => {
+    it("only the community owner can upload, update, and delete community images", async () => {
       const path = `${COMMUNITY}/policy-${Date.now()}.png`;
       assert.ifError((await put(alex, "community-images", path)).error);
       track("community-images", path);
 
-      assert.ok((await put(jamie, "community-images", `${COMMUNITY}/nope-${Date.now()}.png`)).error);
+      assert.ifError(
+        (await alex.storage.from("community-images").update(path, PNG, upload)).error,
+      );
+
+      const { error: roleError } = await alex.rpc("set_community_member_role", {
+        p_community_id: COMMUNITY,
+        p_user_id: JAMIE,
+        p_role: "admin",
+      });
+      assert.ifError(roleError);
+
+      try {
+        assert.ok(
+          (await put(jamie, "community-images", `${COMMUNITY}/nope-${Date.now()}.png`)).error,
+          "community admin must not upload images",
+        );
+
+        const update = await jamie.storage.from("community-images").update(path, PNG, upload);
+        assert.ok(update.error, "community admin must not replace images");
+
+        await jamie.storage.from("community-images").remove([path]);
+        assert.ifError((await admin.storage.from("community-images").download(path)).error);
+      } finally {
+        const { error } = await alex.rpc("set_community_member_role", {
+          p_community_id: COMMUNITY,
+          p_user_id: JAMIE,
+          p_role: "member",
+        });
+        assert.ifError(error);
+      }
     });
 
-    it("a folder for a not-yet-created community id can be uploaded to", async () => {
+    it("rejects uploads before the community row exists", async () => {
       const path = `${crypto.randomUUID()}/pre-${Date.now()}.png`;
-      assert.ifError((await put(jamie, "community-images", path)).error);
-      track("community-images", path);
+      const { error } = await put(alex, "community-images", path);
+      assert.ok(error, "upload should require an existing community owned by the caller");
     });
   });
 
@@ -303,19 +332,25 @@ describe("storage policies and image consistency (local Supabase)", () => {
       assert.ok(bad.error);
     });
 
-    it("create_community with a client id and pre-uploaded avatar; update validates the folder", async () => {
+    it("create_community then upload and update avatar; update validates the folder", async () => {
       const id = crypto.randomUUID();
       const path = `${id}/avatar-${Date.now()}.png`;
-      assert.ifError((await put(alex, "community-images", path)).error);
-      track("community-images", path);
 
       const created = await alex.rpc("create_community", {
-        p_data: { id, name: `Storage community ${id}`, avatar_path: path },
+        p_data: { id, name: `Storage community ${id}` },
       });
       assert.ifError(created.error);
       createdCommunities.push(id);
       assert.equal(created.data.id, id);
-      assert.equal(created.data.avatar_path, path);
+
+      assert.ifError((await put(alex, "community-images", path)).error);
+      track("community-images", path);
+      const updated = await alex.rpc("update_community", {
+        p_community_id: id,
+        p_data: { avatar_path: path },
+      });
+      assert.ifError(updated.error);
+      assert.equal(updated.data.avatar_path, path);
 
       const bad = await alex.rpc("update_community", {
         p_community_id: id,
@@ -417,13 +452,20 @@ describe("storage policies and image consistency (local Supabase)", () => {
     it("deleting a community queues its avatar", async () => {
       const id = crypto.randomUUID();
       const path = `${id}/avatar-${Date.now()}.png`;
+      const created = await alex.rpc("create_community", {
+        p_data: { id, name: `Delete community ${id}` },
+      });
+      assert.ifError(created.error);
+      createdCommunities.push(id);
+
       assert.ifError((await put(alex, "community-images", path)).error);
       track("community-images", path);
-      assert.ifError(
-        (await alex.rpc("create_community", {
-          p_data: { id, name: `Delete community ${id}`, avatar_path: path },
-        })).error,
-      );
+      const updated = await alex.rpc("update_community", {
+        p_community_id: id,
+        p_data: { avatar_path: path },
+      });
+      assert.ifError(updated.error);
+      assert.equal(updated.data.avatar_path, path);
 
       assert.ifError((await alex.rpc("delete_community", { p_community_id: id })).error);
       assert.equal((await pendingQueue("community-images", path)).length, 1);
