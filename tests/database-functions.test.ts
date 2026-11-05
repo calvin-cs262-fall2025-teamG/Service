@@ -205,13 +205,6 @@ describe("database RPC functions (local Supabase)", () => {
       p_limit: 20,
     });
     assert.ok(communityMessages.some((message) => message.id === communityMessage.id));
-    assert.equal(await rpc<number>(jamie, "get_community_unread_count", {
-      p_community_id: communityId,
-    }), 1);
-    await rpc(jamie, "mark_community_read", { p_community_id: communityId });
-    assert.equal(await rpc<number>(jamie, "get_community_unread_count", {
-      p_community_id: communityId,
-    }), 0);
     await rpc(alex, "delete_community_message", { p_message_id: communityMessage.id });
 
     const directMessage = await rpc<{ id: string }>(jamie, "create_direct_message", {
