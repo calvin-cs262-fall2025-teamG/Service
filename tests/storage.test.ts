@@ -185,6 +185,31 @@ describe("storage policies and image consistency (local Supabase)", () => {
       assert.ifError((await jamie.storage.from("item-images").download(path)).error);
       assert.ok((await outsider.storage.from("item-images").download(path)).error);
     });
+
+    it("image access follows item community listings", async () => {
+      const id = crypto.randomUUID();
+      const path = `${ALEX}/${id}/visibility-${Date.now()}.png`;
+      assert.ifError((await put(alex, "item-images", path)).error);
+      track("item-images", path);
+      const created = await alex.rpc("create_item", {
+        p_data: { id, community_ids: [COMMUNITY], name: "Visibility item", image_path: path },
+      });
+      assert.ifError(created.error);
+      createdItems.push(id);
+
+      assert.ifError((await jamie.storage.from("item-images").download(path)).error);
+      assert.ifError((await alex.rpc("update_item", {
+        p_item_id: id,
+        p_data: { community_ids: [] },
+      })).error);
+      assert.ok((await jamie.storage.from("item-images").download(path)).error);
+      assert.ifError((await alex.storage.from("item-images").download(path)).error);
+      assert.ifError((await alex.rpc("update_item", {
+        p_item_id: id,
+        p_data: { community_ids: [COMMUNITY] },
+      })).error);
+      assert.ifError((await jamie.storage.from("item-images").download(path)).error);
+    });
   });
 
   describe("community-images policies", () => {
@@ -274,7 +299,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
       track("item-images", path);
 
       const created = await alex.rpc("create_item", {
-        p_data: { id, community_id: COMMUNITY, name: "Storage test item", image_path: path },
+        p_data: { id, community_ids: [COMMUNITY], name: "Storage test item", image_path: path },
       });
       assert.ifError(created.error);
       createdItems.push(created.data.id);
@@ -289,19 +314,19 @@ describe("storage policies and image consistency (local Supabase)", () => {
       track("item-images", wrongFolder);
 
       const wrong = await alex.rpc("create_item", {
-        p_data: { id, community_id: COMMUNITY, name: "Bad", image_path: wrongFolder },
+        p_data: { id, community_ids: [COMMUNITY], name: "Bad", image_path: wrongFolder },
       });
       assert.ok(wrong.error);
 
       const missing = await alex.rpc("create_item", {
-        p_data: { id, community_id: COMMUNITY, name: "Bad", image_path: `${ALEX}/${id}/none.png` },
+        p_data: { id, community_ids: [COMMUNITY], name: "Bad", image_path: `${ALEX}/${id}/none.png` },
       });
       assert.ok(missing.error);
     });
 
     it("create_item without an id still works", async () => {
       const created = await alex.rpc("create_item", {
-        p_data: { community_id: COMMUNITY, name: "No id item" },
+        p_data: { community_ids: [COMMUNITY], name: "No id item" },
       });
       assert.ifError(created.error);
       createdItems.push(created.data.id);
@@ -311,7 +336,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
 
     it("update_item validates the image path against the item folder", async () => {
       const created = await alex.rpc("create_item", {
-        p_data: { community_id: COMMUNITY, name: "Update image item" },
+        p_data: { community_ids: [COMMUNITY], name: "Update image item" },
       });
       assert.ifError(created.error);
       const itemId = created.data.id as string;
@@ -361,7 +386,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
 
     it("an image path can be cleared with null", async () => {
       const created = await alex.rpc("create_item", {
-        p_data: { community_id: COMMUNITY, name: "Clear image item" },
+        p_data: { community_ids: [COMMUNITY], name: "Clear image item" },
       });
       assert.ifError(created.error);
       createdItems.push(created.data.id);
@@ -393,7 +418,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
 
     it("replacing an image queues the old path", async () => {
       const created = await alex.rpc("create_item", {
-        p_data: { community_id: COMMUNITY, name: "Replace image item" },
+        p_data: { community_ids: [COMMUNITY], name: "Replace image item" },
       });
       assert.ifError(created.error);
       const itemId = created.data.id as string;
@@ -418,7 +443,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
 
     it("updating without changing the image queues nothing", async () => {
       const created = await alex.rpc("create_item", {
-        p_data: { community_id: COMMUNITY, name: "Stable image item" },
+        p_data: { community_ids: [COMMUNITY], name: "Stable image item" },
       });
       assert.ifError(created.error);
       const itemId = created.data.id as string;
@@ -439,7 +464,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
       assert.ifError((await put(alex, "item-images", path)).error);
       track("item-images", path);
       const created = await alex.rpc("create_item", {
-        p_data: { id, community_id: COMMUNITY, name: "Delete image item", image_path: path },
+        p_data: { id, community_ids: [COMMUNITY], name: "Delete image item", image_path: path },
       });
       assert.ifError(created.error);
 

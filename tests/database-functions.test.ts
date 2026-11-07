@@ -76,6 +76,8 @@ describe("database RPC functions (local Supabase)", () => {
   let morgan: SupabaseClient;
   let communityId: string | undefined;
   let directMessageId: string | undefined;
+  const createdItems: string[] = [];
+  const createdCommunities: string[] = [];
 
   before(async () => {
     [alex, jamie, morgan] = await Promise.all([
@@ -86,9 +88,17 @@ describe("database RPC functions (local Supabase)", () => {
   });
 
   after(async () => {
+    if (createdItems.length) {
+      const { error } = await admin.from("items").delete().in("id", createdItems);
+      assert.ifError(error);
+    }
+    if (createdCommunities.length) {
+      const { error } = await admin.from("communities").delete().in("id", createdCommunities);
+      assert.ifError(error);
+    }
     if (communityId) {
       // Use the service client for cleanup so a failed assertion does not leave
-      // test-created memberships, messages, items, and requests behind.
+      // test-created memberships and messages behind.
       const { error } = await admin.from("communities").delete().eq("id", communityId);
       assert.ifError(error);
     }
@@ -177,12 +187,13 @@ describe("database RPC functions (local Supabase)", () => {
 
     const item = await rpc<{ id: string; status: string }>(alex, "create_item", {
       p_data: {
-        community_id: communityId,
+        community_ids: [communityId],
         name: `RPC test item ${suffix}`,
         description: "Original description",
         category: "tools",
       },
     });
+    createdItems.push(item.id);
     assert.equal(item.status, "available");
     assert.equal((await rpc<{ id: string }>(alex, "get_item", { p_item_id: item.id })).id, item.id);
     assert.ok((await rpc<Array<{ id: string }>>(alex, "get_items")).some((row) => row.id === item.id));
@@ -259,8 +270,9 @@ describe("database RPC functions (local Supabase)", () => {
     assert.ok(returned.returned_at);
 
     const jamieItem = await rpc<{ id: string }>(jamie, "create_item", {
-      p_data: { community_id: communityId, name: `RPC decline item ${suffix}` },
+      p_data: { community_ids: [communityId], name: `RPC decline item ${suffix}` },
     });
+    createdItems.push(jamieItem.id);
     const declineRequest = await rpc<{ id: string }>(alex, "create_borrowing_request", {
       p_item_id: jamieItem.id,
     });
@@ -280,5 +292,117 @@ describe("database RPC functions (local Supabase)", () => {
 
     await rpc(alex, "delete_community", { p_community_id: communityId });
     communityId = undefined;
+  });
+
+  it("shares items across communities and removes listings when membership ends", async () => {
+    const jamieId = (await rpc<{ id: string }>(jamie, "get_my_profile")).id;
+    const morganId = (await rpc<{ id: string }>(morgan, "get_my_profile")).id;
+    const first = await rpc<{ id: string }>(alex, "create_community", {
+      p_data: { name: `Item sharing first ${crypto.randomUUID()}` },
+    });
+    createdCommunities.push(first.id);
+    const second = await rpc<{ id: string }>(alex, "create_community", {
+      p_data: { name: `Item sharing second ${crypto.randomUUID()}` },
+    });
+    createdCommunities.push(second.id);
+    const unrelated = await rpc<{ id: string }>(morgan, "create_community", {
+      p_data: { name: `Item sharing unrelated ${crypto.randomUUID()}` },
+    });
+    createdCommunities.push(unrelated.id);
+
+    for (const id of [first.id, second.id]) {
+      await rpc(jamie, "request_join_community", { p_community_id: id });
+      await rpc(alex, "approve_community_member", { p_community_id: id, p_user_id: jamieId });
+    }
+    await rpc(morgan, "request_join_community", { p_community_id: first.id });
+    await rpc(alex, "approve_community_member", {
+      p_community_id: first.id,
+      p_user_id: morganId,
+    });
+    await rpc(morgan, "request_join_community", { p_community_id: second.id });
+
+    const item = await rpc<{ id: string }>(alex, "create_item", {
+      p_data: { name: "Shared item", community_ids: [first.id, second.id] },
+    });
+    createdItems.push(item.id);
+    const communityIds = async (client: SupabaseClient, itemId: string) =>
+      (await rpc<string[]>(client, "get_item_community_ids", { p_item_id: itemId })).sort();
+    assert.deepEqual(await communityIds(alex, item.id), [first.id, second.id].sort());
+    assert.deepEqual(await communityIds(morgan, item.id), [first.id]);
+    for (const id of [first.id, second.id]) {
+      const items = await rpc<Array<{ id: string }>>(jamie, "get_community_items", {
+        p_community_id: id,
+      });
+      assert.ok(items.some((row) => row.id === item.id));
+    }
+
+    const rejectedId = crypto.randomUUID();
+    createdItems.push(rejectedId);
+    const rejectedCreate = await alex.rpc("create_item", {
+      p_data: { id: rejectedId, name: "Not shared", community_ids: [first.id, unrelated.id] },
+    });
+    assert.ok(rejectedCreate.error);
+    assert.match(rejectedCreate.error.message, /Not a member of this community/);
+    const rejectedUpdate = await alex.rpc("update_item", {
+      p_item_id: item.id,
+      p_data: { name: "Should not change", community_ids: [first.id, unrelated.id] },
+    });
+    assert.ok(rejectedUpdate.error);
+    assert.match(rejectedUpdate.error.message, /Not a member of this community/);
+    assert.equal((await rpc<{ name: string }>(alex, "get_item", { p_item_id: item.id })).name, "Shared item");
+    assert.deepEqual(await communityIds(alex, item.id), [first.id, second.id].sort());
+    const pendingId = crypto.randomUUID();
+    createdItems.push(pendingId);
+    const pendingCreate = await morgan.rpc("create_item", {
+      p_data: { id: pendingId, name: "Pending membership", community_ids: [second.id] },
+    });
+    assert.ok(pendingCreate.error);
+    assert.match(pendingCreate.error.message, /Not a member of this community/);
+
+    await rpc(alex, "update_item", { p_item_id: item.id, p_data: { community_ids: [second.id] } });
+    assert.deepEqual(await communityIds(alex, item.id), [second.id]);
+    assert.equal((await rpc<Array<{ id: string }>>(morgan, "get_community_items", {
+      p_community_id: first.id,
+    })).some((row) => row.id === item.id), false);
+    assert.ok((await morgan.rpc("create_borrowing_request", { p_item_id: item.id })).error);
+    await rpc(alex, "update_item", { p_item_id: item.id, p_data: { community_ids: [] } });
+    assert.deepEqual(await communityIds(alex, item.id), []);
+    assert.equal((await rpc<{ id: string }>(alex, "get_item", { p_item_id: item.id })).id, item.id);
+    await rpc(alex, "update_item", {
+      p_item_id: item.id,
+      p_data: { community_ids: [first.id, second.id] },
+    });
+    const request = await rpc<{ id: string }>(morgan, "create_borrowing_request", {
+      p_item_id: item.id,
+    });
+    await rpc(morgan, "cancel_borrowing_request", { p_request_id: request.id });
+
+    const jamieItem = await rpc<{ id: string }>(jamie, "create_item", {
+      p_data: { name: "Member item", community_ids: [first.id, second.id] },
+    });
+    createdItems.push(jamieItem.id);
+    await rpc(jamie, "leave_community", { p_community_id: first.id });
+    assert.deepEqual(await communityIds(jamie, jamieItem.id), [second.id]);
+    assert.equal((await rpc<{ id: string }>(jamie, "get_item", { p_item_id: jamieItem.id })).id, jamieItem.id);
+    await rpc(alex, "remove_community_member", { p_community_id: second.id, p_user_id: jamieId });
+    assert.deepEqual(await communityIds(jamie, jamieItem.id), []);
+
+    const morganItem = await rpc<{ id: string }>(morgan, "create_item", {
+      p_data: { name: "Deactivated member item", community_ids: [first.id] },
+    });
+    createdItems.push(morganItem.id);
+    const deactivated = await admin.from("community_members")
+      .update({ status: "declined" })
+      .match({ community_id: first.id, user_id: morganId });
+    assert.ifError(deactivated.error);
+    assert.deepEqual(await communityIds(morgan, morganItem.id), []);
+
+    await rpc(alex, "delete_community", { p_community_id: first.id });
+    assert.deepEqual(await communityIds(alex, item.id), [second.id]);
+    assert.equal((await rpc<{ id: string }>(alex, "get_item", { p_item_id: item.id })).id, item.id);
+    await rpc(alex, "delete_item", { p_item_id: item.id });
+    const links = await admin.from("community_items").select("community_id").eq("item_id", item.id);
+    assert.ifError(links.error);
+    assert.deepEqual(links.data, []);
   });
 });
