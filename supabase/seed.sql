@@ -1,3 +1,16 @@
+-- Private image buckets (mirrors config.toml). Seed rows below intentionally
+-- leave avatar_path/image_path null: image paths must reference uploaded files.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  ('profile-pictures', 'profile-pictures', false, 5242880, array['image/png', 'image/jpeg', 'image/webp']),
+  ('item-images', 'item-images', false, 5242880, array['image/png', 'image/jpeg', 'image/webp']),
+  ('community-images', 'community-images', false, 5242880, array['image/png', 'image/jpeg', 'image/webp'])
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 -- Local demo users. The auth trigger creates matching profile rows.
 insert into auth.users (
   instance_id,
@@ -112,7 +125,6 @@ set
 insert into public.items (
   id,
   owner_id,
-  community_id,
   name,
   description,
   category,
@@ -123,7 +135,6 @@ values
   (
     '30000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000001',
-    '20000000-0000-0000-0000-000000000001',
     'Cordless drill',
     '18V drill with charger and a small set of bits.',
     'Tools',
@@ -133,7 +144,6 @@ values
   (
     '30000000-0000-0000-0000-000000000002',
     '10000000-0000-0000-0000-000000000002',
-    '20000000-0000-0000-0000-000000000001',
     'Folding chairs',
     'Set of four lightweight chairs for a backyard gathering.',
     'Home & Garden',
@@ -143,7 +153,6 @@ values
   (
     '30000000-0000-0000-0000-000000000003',
     '10000000-0000-0000-0000-000000000003',
-    '20000000-0000-0000-0000-000000000001',
     'Two-person tent',
     'Compact tent, suitable for a weekend camping trip.',
     'Outdoor',
@@ -153,12 +162,18 @@ values
 on conflict (id) do update
 set
   owner_id = excluded.owner_id,
-  community_id = excluded.community_id,
   name = excluded.name,
   description = excluded.description,
   category = excluded.category,
   status = excluded.status,
   return_date = excluded.return_date;
+
+insert into public.community_items (item_id, community_id)
+values
+  ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001'),
+  ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000001'),
+  ('30000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000001')
+on conflict (item_id, community_id) do nothing;
 
 insert into public.borrowing_requests (
   id,

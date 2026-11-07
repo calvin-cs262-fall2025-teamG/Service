@@ -163,6 +163,7 @@ describe("RLS policies (local Supabase)", () => {
     for (const table of [
       "profiles",
       "items",
+      "community_items",
       "borrowing_requests",
       "borrowing_history",
       "direct_messages",
@@ -179,7 +180,7 @@ describe("RLS policies (local Supabase)", () => {
     it("cannot insert items", async () => {
       const res = await anon
         .from("items")
-        .insert({ owner_id: ALEX, community_id: COMMUNITY, name: "x" });
+        .insert({ owner_id: ALEX, name: "x" });
       assert.ok(res.error);
     });
   });
@@ -240,6 +241,69 @@ describe("RLS policies (local Supabase)", () => {
       }
     });
 
+    describe("community_items", () => {
+      it("allows only owners to share with active communities and remove their listings", async () => {
+        const community = await admin.from("communities")
+          .insert({ name: `RLS item sharing ${crypto.randomUUID()}`, owner_id: ALEX })
+          .select("id")
+          .single();
+        assert.ifError(community.error);
+        const otherCommunityId = community.data.id as string;
+        createdCommunities.push(otherCommunityId);
+
+        const pending = await admin.from("community_members").insert({
+          community_id: otherCommunityId,
+          user_id: JAMIE,
+          status: "pending",
+        });
+        assert.ifError(pending.error);
+
+        const item = await jamie.from("items")
+          .insert({ owner_id: JAMIE, name: "RLS shared item" })
+          .select("id")
+          .single();
+        assert.ifError(item.error);
+        const itemId = item.data.id as string;
+        createdItems.push(itemId);
+
+        assertRlsError(await jamie.from("community_items").insert({
+          item_id: itemId,
+          community_id: otherCommunityId,
+        }));
+        assertRlsError(await outsider.from("community_items").insert({
+          item_id: itemId,
+          community_id: COMMUNITY,
+        }));
+        assertRlsError(await jamie.from("community_items").insert({
+          item_id: DRILL,
+          community_id: COMMUNITY,
+        }));
+        const added = await jamie.from("community_items")
+          .insert({ item_id: itemId, community_id: COMMUNITY })
+          .select("item_id,community_id");
+        assert.ifError(added.error);
+        assert.equal(added.data?.length, 1);
+
+        const memberLinks = await alex.from("community_items").select("item_id")
+          .eq("item_id", itemId);
+        assert.ifError(memberLinks.error);
+        assert.equal(memberLinks.data?.length, 1);
+        const outsiderLinks = await outsider.from("community_items").select("item_id")
+          .eq("item_id", itemId);
+        assert.ifError(outsiderLinks.error);
+        assert.deepEqual(outsiderLinks.data, []);
+        assertDenied(await alex.from("community_items").delete()
+          .match({ item_id: itemId, community_id: COMMUNITY }).select());
+
+        const removed = await jamie.from("community_items").delete()
+          .match({ item_id: itemId, community_id: COMMUNITY }).select();
+        assert.ifError(removed.error);
+        assert.equal(removed.data?.length, 1);
+        assert.deepEqual(await ids(alex.from("items").select("id").eq("id", itemId)), []);
+        assert.deepEqual(await ids(jamie.from("items").select("id").eq("id", itemId)), [itemId]);
+      });
+    });
+
     it("non-members cannot see community items", async () => {
       assert.deepEqual(await ids(outsider.from("items").select("id")), []);
     });
@@ -263,7 +327,7 @@ describe("RLS policies (local Supabase)", () => {
     it("a user can create, update and delete their own item", async () => {
       const ins = await jamie
         .from("items")
-        .insert({ owner_id: JAMIE, community_id: COMMUNITY, name: "RLS ladder" })
+        .insert({ owner_id: JAMIE, name: "RLS ladder" })
         .select()
         .single();
       assert.ifError(ins.error);
@@ -286,7 +350,7 @@ describe("RLS policies (local Supabase)", () => {
     it("a user cannot create an item owned by someone else", async () => {
       const res = await jamie
         .from("items")
-        .insert({ owner_id: ALEX, community_id: COMMUNITY, name: "Spoof" });
+        .insert({ owner_id: ALEX, name: "Spoof" });
       assertRlsError(res);
     });
 
