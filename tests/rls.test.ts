@@ -624,6 +624,8 @@ describe("RLS policies (local Supabase)", () => {
   });
 
   describe("communities", () => {
+    let jamieCommunityId: string;
+
     it("authenticated users can view communities", async () => {
       assert.ok((await ids(outsider.from("communities").select("id"))).includes(COMMUNITY));
     });
@@ -643,6 +645,7 @@ describe("RLS policies (local Supabase)", () => {
       assert.ifError(ok.error);
       const id = ok.data!.id as string;
       createdCommunities.push(id);
+      jamieCommunityId = id;
 
       const { data } = await jamie
         .from("community_members")
@@ -661,7 +664,7 @@ describe("RLS policies (local Supabase)", () => {
       const { data } = await admin.from("communities").select("name").eq("id", COMMUNITY);
       assert.equal(data?.[0]?.name, "Maple Street Neighbors");
 
-      const id = createdCommunities[0];
+      const id = jamieCommunityId;
       assert.ok(id, "depends on the community created above");
       const upd = await jamie
         .from("communities")
@@ -673,7 +676,8 @@ describe("RLS policies (local Supabase)", () => {
     });
 
     it("owner cannot transfer ownership to another user via update", async () => {
-      const id = createdCommunities[0];
+      const id = jamieCommunityId;
+      assert.ok(id, "depends on the community created above");
       assertRlsError(
         await jamie.from("communities").update({ owner_id: ALEX }).eq("id", id),
       );
