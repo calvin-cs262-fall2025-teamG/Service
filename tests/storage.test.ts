@@ -250,10 +250,15 @@ describe("storage policies and image consistency (local Supabase)", () => {
       }
     });
 
-    it("rejects uploads before the community row exists", async () => {
-      const path = `${crypto.randomUUID()}/pre-${Date.now()}.png`;
-      const { error } = await put(alex, "community-images", path);
-      assert.ok(error, "upload should require an existing community owned by the caller");
+    it("allows pre-creation uploads only in the caller's user folder", async () => {
+      const id = crypto.randomUUID();
+      const path = `${id}/${ALEX}/pre-${Date.now()}.png`;
+      assert.ifError((await put(alex, "community-images", path)).error);
+      track("community-images", path);
+
+      assert.ok((await put(alex, "community-images", `${id}/loose.png`)).error);
+      assert.ok((await put(jamie, "community-images", `${id}/${ALEX}/other.png`)).error);
+      assert.ok((await put(jamie, "community-images", `${COMMUNITY}/${JAMIE}/other.png`)).error);
     });
   });
 
@@ -355,6 +360,31 @@ describe("storage policies and image consistency (local Supabase)", () => {
         p_data: { image_path: `${ALEX}/${DRILL}/other.png` },
       });
       assert.ok(bad.error);
+    });
+
+    it("create_community accepts a pre-uploaded image owned by the caller", async () => {
+      const id = crypto.randomUUID();
+      const path = `${id}/${ALEX}/avatar-${Date.now()}.png`;
+      const otherPath = `${id}/${JAMIE}/avatar-${Date.now()}.png`;
+      assert.ifError((await put(alex, "community-images", path)).error);
+      track("community-images", path);
+      assert.ifError((await put(jamie, "community-images", otherPath)).error);
+      track("community-images", otherPath);
+
+      const wrongOwner = await alex.rpc("create_community", {
+        p_data: { id, name: `Storage community ${id}`, avatar_path: otherPath },
+      });
+      assert.ok(wrongOwner.error);
+
+      const created = await alex.rpc("create_community", {
+        p_data: { id, name: `Storage community ${id}`, avatar_path: path },
+      });
+      assert.ifError(created.error);
+      createdCommunities.push(id);
+      assert.equal(created.data.id, id);
+      assert.equal(created.data.avatar_path, path);
+      assert.ifError((await alex.storage.from("community-images").download(path)).error);
+      assert.ok((await put(jamie, "community-images", `${id}/${JAMIE}/later.png`)).error);
     });
 
     it("create_community then upload and update avatar; update validates the folder", async () => {
