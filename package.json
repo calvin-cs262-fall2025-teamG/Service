@@ -1,49 +1,27 @@
 {
-    "name": "cs262-webservice",
-    "version": "1.0.0",
-    "description": "CS 262 Web service",
-    "main": "src/heyNeighborService.ts",
-    "type": "module",
-    "author": "kvlinden",
-    "license": "ISC",
-    "engines": {
-        "node": "22.x"
-    },
-    "scripts": {
-        "start": "node --experimental-strip-types src/heyNeighborService.ts",
-        "type-check": "tsc --noEmit",
-        "lint": "eslint .",
-        "test": "node --experimental-strip-types --test --test-concurrency=1 \"tests\\*.test.ts\"",
-        "test:database-functions": "node --experimental-strip-types --test tests/database-functions.test.ts",
-        "test:rls": "node --experimental-strip-types --test tests/rls.test.ts",
-        "test:auth": "node --experimental-strip-types --test tests/auth.test.ts",
-        "test:storage": "node --experimental-strip-types --test tests/storage.test.ts",
-        "test:member-roles": "node --experimental-strip-types --test tests/member-roles.test.ts"
-    },
-    "dependencies": {
-        "@supabase/server": "^1.8.0",
-        "bcrypt": "^6.0.0",
-        "cors": "^2.8.6",
-        "dotenv": "^17.2.3",
-        "express": "5.x",
-        "multer": "^2.0.2",
-        "nodemailer": "^7.0.11",
-        "pg-promise": "11.x"
-    },
-    "devDependencies": {
-        "@snaplet/copycat": "^6.0.0",
-        "@snaplet/seed": "^0.98.0",
-        "@supabase/supabase-js": "^2.117.0",
-        "@types/bcrypt": "^6.0.0",
-        "@types/cors": "^2.8.19",
-        "@types/express": "^4.17.21",
-        "@types/multer": "^2.0.0",
-        "@types/node": "^22.19.2",
-        "@types/nodemailer": "^7.0.4",
-        "@typescript-eslint/eslint-plugin": "^8.36.0",
-        "@typescript-eslint/parser": "^8.36.0",
-        "eslint": "9.x",
-        "postgres": "^3.4.9",
-        "typescript": "^5.9.3"
-    }
+  "name": "heyneighbor-supabase",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Supabase migrations, local integration tests, and seed configuration for HeyNeighbor",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test --test-concurrency=1 tests/auth.test.ts tests/database-functions.test.ts tests/member-roles.test.ts tests/rls.test.ts tests/storage.test.ts",
+    "test:database-functions": "node --experimental-strip-types --test tests/database-functions.test.ts",
+    "test:rls": "node --experimental-strip-types --test tests/rls.test.ts",
+    "test:auth": "node --experimental-strip-types --test tests/auth.test.ts",
+    "test:storage": "node --experimental-strip-types --test tests/storage.test.ts",
+    "test:member-roles": "node --experimental-strip-types --test tests/member-roles.test.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@snaplet/copycat": "^6.0.0",
+    "@snaplet/seed": "^0.98.0",
+    "@supabase/supabase-js": "^2.117.0",
+    "@types/node": "^22.19.2",
+    "postgres": "^3.4.9",
+    "typescript": "^5.9.3"
+  }
 }

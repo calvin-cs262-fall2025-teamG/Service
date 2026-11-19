@@ -125,7 +125,7 @@ describe("storage policies and image consistency (local Supabase)", () => {
       const { data, error } = await admin.storage.listBuckets();
       assert.ifError(error);
       for (const name of ["profile-pictures", "item-images", "community-images"]) {
-        const bucket = data.find((b) => b.id === name);
+        const bucket: (typeof data)[number] | undefined = data.find((b) => b.id === name);
         assert.ok(bucket, `missing bucket ${name}`);
         assert.equal(bucket.public, false);
       }
